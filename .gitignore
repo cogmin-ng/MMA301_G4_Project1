@@ -3,6 +3,8 @@
 # Dependencies
 node_modules/
 server/node_modules/
+server/uploads/*
+!server/uploads/.gitkeep
 .pnp
 .pnp.js
 

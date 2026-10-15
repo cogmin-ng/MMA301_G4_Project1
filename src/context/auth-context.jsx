@@ -57,6 +57,10 @@ export function AuthProvider({ children }) {
   const isDoctor = role === 'DOCTOR';
   const isPatient = role === 'PATIENT';
 
+  const updateUser = (updatedUser) => {
+    setUser((prev) => ({ ...prev, ...updatedUser }));
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -71,6 +75,7 @@ export function AuthProvider({ children }) {
         register,
         logout,
         switchRole,
+        updateUser,
       }}>
       {children}
     </AuthContext.Provider>

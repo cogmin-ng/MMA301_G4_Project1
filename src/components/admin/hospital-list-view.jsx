@@ -16,7 +16,9 @@ import {
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Card, Chip, Divider } from 'react-native-paper';
+import * as ImagePicker from 'expo-image-picker';
 import { hospitalService } from '@/services/hospital-service';
+import { uploadService } from '@/services/upload-service';
 import { MedicalColors, Spacing } from '@/constants/theme';
 
 export function HospitalListView({
@@ -51,6 +53,7 @@ export function HospitalListView({
   const [formStatus, setFormStatus] = useState('ACTIVE');
   const [formSubmitting, setFormSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
+  const [uploadingImage, setUploadingImage] = useState(false);
 
   const loadHospitals = useCallback(async () => {
     try {
@@ -87,6 +90,83 @@ export function HospitalListView({
     loadProvinces();
   };
 
+  const handlePickImage = async () => {
+    try {
+      if (Platform.OS === 'web') {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/jpeg,image/png,image/webp,image/gif';
+        input.onchange = async (e) => {
+          const file = e.target.files?.[0];
+          if (!file) return;
+          if (file.size > 10 * 1024 * 1024) {
+            Alert.alert('Lỗi', 'Dung lượng ảnh tối đa là 10MB.');
+            return;
+          }
+          setUploadingImage(true);
+          try {
+            const url = await uploadService.uploadFile(file);
+            setFormImageUrl(url);
+          } catch (err) {
+            Alert.alert('Lỗi tải ảnh', err.message || 'Không thể tải ảnh lên máy chủ');
+          } finally {
+            setUploadingImage(false);
+          }
+        };
+        input.click();
+        return;
+      }
+
+      // Trên thiết bị di động Native (iOS/Android)
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert(
+          'Quyền truy cập',
+          'Vui lòng cấp quyền truy cập thư viện ảnh để tải ảnh cơ sở y tế.'
+        );
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [16, 9],
+        quality: 0.85,
+        base64: true,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const asset = result.assets[0];
+        setUploadingImage(true);
+        try {
+          let url = '';
+          if (asset.base64) {
+            url = await uploadService.uploadBase64(
+              `data:${asset.mimeType || 'image/jpeg'};base64,${asset.base64}`,
+              asset.fileName || 'hospital.jpg'
+            );
+          } else {
+            const formData = new FormData();
+            formData.append('file', {
+              uri: asset.uri,
+              name: asset.fileName || 'hospital.jpg',
+              type: asset.mimeType || 'image/jpeg',
+            });
+            url = await uploadService.uploadFile(formData);
+          }
+          setFormImageUrl(url);
+        } catch (err) {
+          Alert.alert('Lỗi tải ảnh', err.message || 'Không thể tải ảnh lên');
+        } finally {
+          setUploadingImage(false);
+        }
+      }
+    } catch (err) {
+      console.error('Lỗi chọn ảnh:', err);
+      Alert.alert('Lỗi', 'Không thể chọn ảnh: ' + err.message);
+    }
+  };
+
   const openCreateModal = () => {
     setFormName('');
     setFormAddress('');
@@ -95,9 +175,7 @@ export function HospitalListView({
     setFormPhone('');
     setFormEmail('');
     setFormDescription('');
-    setFormImageUrl(
-      'https://images.unsplash.com/photo-1587351021759-3e566b6af7cc?w=600'
-    );
+    setFormImageUrl('');
     setFormStatus('ACTIVE');
     setFormError('');
     setModalType('CREATE');
@@ -373,7 +451,7 @@ export function HospitalListView({
                         </Text>
                       </View>
 
-                      <Text style={styles.hospitalName} numberOfLines={1}>
+                      <Text style={styles.hospitalName} numberOfLines={2}>
                         {item.name}
                       </Text>
                       <Text style={styles.hospitalAddress} numberOfLines={1}>
@@ -528,13 +606,61 @@ export function HospitalListView({
                 </View>
               </View>
 
-              <Text style={styles.formLabel}>URL Hình ảnh đại diện</Text>
-              <TextInput
-                style={styles.formInput}
-                placeholder="https://..."
-                value={formImageUrl}
-                onChangeText={setFormImageUrl}
-              />
+              <Text style={styles.formLabel}>Hình ảnh đại diện cơ sở y tế</Text>
+
+              {/* Upload Dropzone / Preview */}
+              {formImageUrl ? (
+                <View style={styles.imagePreviewBox}>
+                  <Image source={{ uri: formImageUrl }} style={styles.previewImage} />
+                  <View style={styles.imageOverlayControls}>
+                    <TouchableOpacity
+                      style={styles.changeImageBtn}
+                      activeOpacity={0.8}
+                      onPress={handlePickImage}
+                      disabled={uploadingImage}>
+                      <MaterialCommunityIcons name="image-edit-outline" size={16} color="#FFFFFF" />
+                      <Text style={styles.changeImageText}>
+                        {uploadingImage ? 'Đang tải...' : 'Đổi ảnh khác'}
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.removeImageBtn}
+                      activeOpacity={0.8}
+                      onPress={() => setFormImageUrl('')}
+                      disabled={uploadingImage}>
+                      <MaterialCommunityIcons name="trash-can-outline" size={16} color="#FFFFFF" />
+                      <Text style={styles.changeImageText}>Xóa</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <View style={styles.uploadSuccessBadge}>
+                    <MaterialCommunityIcons name="check-circle" size={12} color="#16A34A" />
+                    <Text style={styles.uploadSuccessText}>Đã tải ảnh lên máy chủ</Text>
+                  </View>
+                </View>
+              ) : (
+                <TouchableOpacity
+                  style={styles.uploadDropzone}
+                  activeOpacity={0.7}
+                  onPress={handlePickImage}
+                  disabled={uploadingImage}>
+                  {uploadingImage ? (
+                    <View style={styles.uploadingContainer}>
+                      <ActivityIndicator size="small" color={MedicalColors.primary} />
+                      <Text style={styles.uploadingText}>Đang tải ảnh lên máy chủ...</Text>
+                    </View>
+                  ) : (
+                    <>
+                      <View style={styles.uploadIconCircle}>
+                        <MaterialCommunityIcons name="cloud-upload" size={26} color="#0284C7" />
+                      </View>
+                      <Text style={styles.uploadPrimaryText}>Bấm để chọn và tải tệp ảnh lên</Text>
+                      <Text style={styles.uploadSecondaryText}>
+                        Hỗ trợ định dạng JPG, PNG, WEBP (Tối đa 10MB)
+                      </Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              )}
 
               <Text style={styles.formLabel}>Giới thiệu / Cơ sở vật chất</Text>
               <TextInput
@@ -1215,4 +1341,110 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#64748B',
   },
+
+  // Image Upload & Preview styles
+  imagePreviewBox: {
+    height: 140,
+    borderRadius: 10,
+    overflow: 'hidden',
+    position: 'relative',
+    marginTop: 4,
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    backgroundColor: '#0F172A',
+  },
+  previewImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  imageOverlayControls: {
+    position: 'absolute',
+    bottom: 8,
+    right: 8,
+    flexDirection: 'row',
+    gap: 8,
+  },
+  changeImageBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(15, 23, 42, 0.75)',
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: 6,
+  },
+  removeImageBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(220, 38, 38, 0.85)',
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: 6,
+  },
+  changeImageText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  uploadSuccessBadge: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.92)',
+    paddingVertical: 3,
+    paddingHorizontal: 8,
+    borderRadius: 12,
+  },
+  uploadSuccessText: {
+    color: '#16A34A',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  uploadDropzone: {
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    borderColor: '#0284C7',
+    borderRadius: 10,
+    backgroundColor: '#F0F9FF',
+    paddingVertical: 18,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 4,
+  },
+  uploadIconCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#E0F2FE',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 6,
+  },
+  uploadPrimaryText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#0284C7',
+    marginBottom: 2,
+  },
+  uploadSecondaryText: {
+    fontSize: 11,
+    color: '#64748B',
+  },
+  uploadingContainer: {
+    paddingVertical: 12,
+    alignItems: 'center',
+    gap: 8,
+  },
+  uploadingText: {
+    fontSize: 12,
+    color: '#0284C7',
+    fontWeight: '600',
+  },
 });
+

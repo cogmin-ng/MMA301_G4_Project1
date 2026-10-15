@@ -146,6 +146,24 @@ class AuthService {
     this.token = `jwt-${user.id}-${user.role.toLowerCase()}-${Date.now()}`;
     return user;
   }
+
+  async updateAvatar(userId, avatar) {
+    const res = await fetch(`${API_BASE_URL}/auth/users/${userId}/avatar`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ avatar }),
+    });
+    let data;
+    try {
+      data = await res.json();
+    } catch {
+      throw new Error(`Máy chủ không phản hồi JSON (Mã ${res.status}).`);
+    }
+    if (!res.ok) {
+      throw new Error(data.error || 'Cập nhật ảnh đại diện thất bại.');
+    }
+    return data.user;
+  }
 }
 
 export const authService = new AuthService();

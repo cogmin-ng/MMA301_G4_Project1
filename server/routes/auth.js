@@ -172,7 +172,7 @@ router.patch('/users/:id/status', async (req, res) => {
 // POST /api/auth/users (Tạo tài khoản mới và chỉ định vai trò bởi Admin)
 router.post('/users', async (req, res) => {
   try {
-    const { full_name, email, phone, password, role } = req.body;
+    const { full_name, email, phone, password, role, avatar } = req.body;
     if (!full_name || !email || !password || !role) {
       return res.status(400).json({ error: 'Vui lòng cung cấp họ tên, email, mật khẩu và vai trò.' });
     }
@@ -182,10 +182,12 @@ router.post('/users', async (req, res) => {
       return res.status(409).json({ error: 'Email này đã tồn tại trong CSDL.' });
     }
 
+    const defaultAvatar = avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150';
+
     const [result] = await pool.query(
       `INSERT INTO users (full_name, email, phone, password, role, is_active, avatar)
-       VALUES (?, ?, ?, ?, ?, TRUE, 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150')`,
-      [full_name.trim(), email.trim().toLowerCase(), phone?.trim() || null, password, role]
+       VALUES (?, ?, ?, ?, ?, TRUE, ?)`,
+      [full_name.trim(), email.trim().toLowerCase(), phone?.trim() || null, password, role, defaultAvatar]
     );
 
     const newId = result.insertId;
@@ -199,8 +201,25 @@ router.post('/users', async (req, res) => {
       await pool.query('INSERT INTO patient_profiles (user_id) VALUES (?)', [newId]);
     }
 
-    const [newUser] = await pool.query('SELECT id, full_name, email, phone, role, is_active FROM users WHERE id = ?', [newId]);
+    const [newUser] = await pool.query('SELECT id, full_name, email, phone, role, avatar, is_active FROM users WHERE id = ?', [newId]);
     return res.status(201).json({ message: 'Tạo tài khoản thành công trong MySQL.', user: newUser[0] });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// PATCH /api/auth/users/:id/avatar (Cập nhật ảnh đại diện người dùng)
+router.patch('/users/:id/avatar', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { avatar } = req.body;
+    if (!avatar) {
+      return res.status(400).json({ error: 'Vui lòng cung cấp đường dẫn ảnh đại diện.' });
+    }
+
+    await pool.query('UPDATE users SET avatar = ?, updated_at = NOW() WHERE id = ?', [avatar, id]);
+    const [rows] = await pool.query('SELECT id, full_name, email, phone, role, avatar, is_active FROM users WHERE id = ?', [id]);
+    return res.json({ message: 'Cập nhật ảnh đại diện thành công.', user: rows[0] });
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }

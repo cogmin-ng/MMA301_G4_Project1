@@ -15,7 +15,9 @@ import {
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Card, Badge, Divider } from 'react-native-paper';
+import * as ImagePicker from 'expo-image-picker';
 import { authService } from '@/services/auth-service';
+import { uploadService } from '@/services/upload-service';
 import { useAuth } from '@/context/auth-context';
 import { MedicalColors, Spacing } from '@/constants/theme';
 
@@ -41,6 +43,8 @@ export function UserRbacView({ onBackToHome }) {
   const [newPhone, setNewPhone] = useState('');
   const [newPassword, setNewPassword] = useState('123456');
   const [newRole, setNewRole] = useState('PATIENT');
+  const [newAvatar, setNewAvatar] = useState('');
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [creating, setCreating] = useState(false);
 
   const loadUsers = useCallback(async () => {
@@ -170,6 +174,79 @@ export function UserRbacView({ onBackToHome }) {
     );
   };
 
+  // Tải ảnh đại diện người dùng
+  const handlePickAvatar = async () => {
+    try {
+      if (Platform.OS === 'web') {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/jpeg,image/png,image/webp,image/gif';
+        input.onchange = async (e) => {
+          const file = e.target.files?.[0];
+          if (!file) return;
+          if (file.size > 10 * 1024 * 1024) {
+            notify('Lỗi', 'Dung lượng ảnh tối đa là 10MB.');
+            return;
+          }
+          setUploadingAvatar(true);
+          try {
+            const url = await uploadService.uploadFile(file);
+            setNewAvatar(url);
+          } catch (err) {
+            notify('Lỗi tải ảnh', err.message || 'Không thể tải ảnh lên');
+          } finally {
+            setUploadingAvatar(false);
+          }
+        };
+        input.click();
+        return;
+      }
+
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        notify('Quyền truy cập', 'Vui lòng cấp quyền thư viện ảnh để tải ảnh đại diện.');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.85,
+        base64: true,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const asset = result.assets[0];
+        setUploadingAvatar(true);
+        try {
+          let url = '';
+          if (asset.base64) {
+            url = await uploadService.uploadBase64(
+              `data:${asset.mimeType || 'image/jpeg'};base64,${asset.base64}`,
+              asset.fileName || 'avatar.jpg'
+            );
+          } else {
+            const formData = new FormData();
+            formData.append('file', {
+              uri: asset.uri,
+              name: asset.fileName || 'avatar.jpg',
+              type: asset.mimeType || 'image/jpeg',
+            });
+            url = await uploadService.uploadFile(formData);
+          }
+          setNewAvatar(url);
+        } catch (err) {
+          notify('Lỗi tải ảnh', err.message || 'Không thể tải ảnh lên');
+        } finally {
+          setUploadingAvatar(false);
+        }
+      }
+    } catch (err) {
+      notify('Lỗi', 'Không thể chọn ảnh: ' + err.message);
+    }
+  };
+
   // Tạo tài khoản mới
   const handleCreateUser = async () => {
     if (!newFullName.trim() || !newEmail.trim() || !newPassword) {
@@ -185,6 +262,7 @@ export function UserRbacView({ onBackToHome }) {
         phone: newPhone.trim() || undefined,
         password: newPassword,
         role: newRole,
+        avatar: newAvatar || undefined,
       });
 
       notify(
@@ -197,6 +275,7 @@ export function UserRbacView({ onBackToHome }) {
       setNewPhone('');
       setNewPassword('123456');
       setNewRole('PATIENT');
+      setNewAvatar('');
       loadUsers();
     } catch (err) {
       notify('Lỗi', err.message);
@@ -600,6 +679,49 @@ export function UserRbacView({ onBackToHome }) {
                 Tạo tài khoản mới và cấp quyền truy cập hệ thống.
               </Text>
               <Divider style={{ marginVertical: 10 }} />
+
+              {/* Avatar File Upload */}
+              <View style={styles.avatarUploadRow}>
+                <View style={styles.avatarUploadContainer}>
+                  {newAvatar ? (
+                    <Image source={{ uri: newAvatar }} style={styles.avatarPreviewImg} />
+                  ) : (
+                    <View style={styles.avatarPlaceholder}>
+                      <MaterialCommunityIcons name="account" size={36} color="#94A3B8" />
+                    </View>
+                  )}
+                </View>
+                <View style={{ flex: 1, gap: 6 }}>
+                  <TouchableOpacity
+                    style={styles.avatarUploadBtn}
+                    onPress={handlePickAvatar}
+                    disabled={uploadingAvatar}
+                    activeOpacity={0.8}>
+                    <MaterialCommunityIcons
+                      name="cloud-upload"
+                      size={18}
+                      color="#0284C7"
+                    />
+                    <Text style={styles.avatarUploadBtnText}>
+                      {uploadingAvatar
+                        ? 'Đang tải...'
+                        : newAvatar
+                        ? 'Đổi ảnh đại diện'
+                        : 'Tải ảnh đại diện'}
+                    </Text>
+                  </TouchableOpacity>
+                  {newAvatar ? (
+                    <TouchableOpacity
+                      style={styles.avatarRemoveBtn}
+                      onPress={() => setNewAvatar('')}
+                      disabled={uploadingAvatar}>
+                      <Text style={styles.avatarRemoveBtnText}>Xóa ảnh đại diện</Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <Text style={styles.avatarNoteText}>Hỗ trợ JPG, PNG (tối đa 10MB)</Text>
+                  )}
+                </View>
+              </View>
 
               <Text style={styles.inputLabel}>Họ và tên *</Text>
               <TextInput
@@ -1204,5 +1326,71 @@ const styles = StyleSheet.create({
   roleChoiceBtnTextActive: {
     color: MedicalColors.primary,
     fontWeight: '700',
+  },
+
+  // Avatar Upload styles
+  avatarUploadRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    marginBottom: 12,
+    padding: 10,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  avatarUploadContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#EDF2F7',
+    overflow: 'hidden',
+    borderWidth: 2,
+    borderColor: '#0284C7',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarPreviewImg: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  avatarPlaceholder: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#E2E8F0',
+  },
+  avatarUploadBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#E0F2FE',
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    alignSelf: 'flex-start',
+    borderWidth: 1,
+    borderColor: '#BAE6FD',
+  },
+  avatarUploadBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#0284C7',
+  },
+  avatarRemoveBtn: {
+    alignSelf: 'flex-start',
+    paddingVertical: 2,
+  },
+  avatarRemoveBtnText: {
+    fontSize: 11,
+    color: '#DC2626',
+    fontWeight: '600',
+  },
+  avatarNoteText: {
+    fontSize: 11,
+    color: '#94A3B8',
   },
 });
