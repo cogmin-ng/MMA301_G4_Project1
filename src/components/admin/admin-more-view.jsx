@@ -5,6 +5,7 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  Image,
   Alert,
   Modal,
   TextInput,
@@ -12,7 +13,10 @@ import {
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Divider } from 'react-native-paper';
+import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '@/context/auth-context';
+import { uploadService } from '@/services/upload-service';
+import { authService } from '@/services/auth-service';
 import { MedicalColors, Spacing } from '@/constants/theme';
 
 export function AdminMoreView({
@@ -20,7 +24,8 @@ export function AdminMoreView({
   onNavigateToDashboard,
   onNavigateToRbac,
 }) {
-  const { user, switchRole, logout } = useAuth();
+  const { user, switchRole, logout, updateUser } = useAuth();
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
   // Modals state
   const [buildingModalVisible, setBuildingModalVisible] = useState(false);
@@ -73,6 +78,86 @@ export function AdminMoreView({
     );
   };
 
+  const handleUploadMyAvatar = async () => {
+    try {
+      if (Platform.OS === 'web') {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/jpeg,image/png,image/webp,image/gif';
+        input.onchange = async (e) => {
+          const file = e.target.files?.[0];
+          if (!file) return;
+          if (file.size > 10 * 1024 * 1024) {
+            Alert.alert('Lỗi', 'Dung lượng ảnh tối đa là 10MB.');
+            return;
+          }
+          setUploadingAvatar(true);
+          try {
+            const url = await uploadService.uploadFile(file);
+            if (user?.id) {
+              await authService.updateAvatar(user.id, url);
+              updateUser({ avatar: url });
+              Alert.alert('Thành công', 'Đã cập nhật ảnh đại diện thành công!');
+            }
+          } catch (err) {
+            Alert.alert('Lỗi tải ảnh', err.message || 'Không thể cập nhật ảnh đại diện');
+          } finally {
+            setUploadingAvatar(false);
+          }
+        };
+        input.click();
+        return;
+      }
+
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Quyền truy cập', 'Vui lòng cấp quyền truy cập ảnh để đổi ảnh đại diện.');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.85,
+        base64: true,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const asset = result.assets[0];
+        setUploadingAvatar(true);
+        try {
+          let url = '';
+          if (asset.base64) {
+            url = await uploadService.uploadBase64(
+              `data:${asset.mimeType || 'image/jpeg'};base64,${asset.base64}`,
+              asset.fileName || 'my-avatar.jpg'
+            );
+          } else {
+            const formData = new FormData();
+            formData.append('file', {
+              uri: asset.uri,
+              name: asset.fileName || 'my-avatar.jpg',
+              type: asset.mimeType || 'image/jpeg',
+            });
+            url = await uploadService.uploadFile(formData);
+          }
+          if (user?.id) {
+            await authService.updateAvatar(user.id, url);
+            updateUser({ avatar: url });
+            Alert.alert('Thành công', 'Đã cập nhật ảnh đại diện thành công!');
+          }
+        } catch (err) {
+          Alert.alert('Lỗi tải ảnh', err.message || 'Không thể cập nhật ảnh');
+        } finally {
+          setUploadingAvatar(false);
+        }
+      }
+    } catch (err) {
+      Alert.alert('Lỗi', 'Không thể chọn ảnh: ' + err.message);
+    }
+  };
+
   return (
     <View style={styles.screenWrapper}>
       {/* Thanh viền xanh trên cùng chuẩn ảnh mẫu */}
@@ -84,15 +169,31 @@ export function AdminMoreView({
         showsVerticalScrollIndicator={false}>
         {/* 1. Header: Logo tròn + Tên người dùng + Nút Đăng xuất màu cam */}
         <View style={styles.headerRow}>
-          <View style={styles.headerUserSection}>
-            <View style={styles.circleLogoBadge}>
-              <MaterialCommunityIcons name="hospital-building" size={24} color="#0284C7" />
-              <Text style={styles.circleLogoText}>ADMIN</Text>
+          <TouchableOpacity
+            style={styles.headerUserSection}
+            activeOpacity={0.8}
+            onPress={() => setProfileModalVisible(true)}>
+            {user?.avatar ? (
+              <Image source={{ uri: user.avatar }} style={styles.circleAvatarImg} />
+            ) : (
+              <View style={styles.circleLogoBadge}>
+                <MaterialCommunityIcons name="hospital-building" size={24} color="#0284C7" />
+                <Text style={styles.circleLogoText}>ADMIN</Text>
+              </View>
+            )}
+            <View>
+              <Text style={styles.userName}>
+                {user?.full_name || 'Quản trị viên'}
+              </Text>
+              <Text style={styles.userRoleSubtitle}>
+                {user?.role === 'ADMIN'
+                  ? 'Quản trị viên (ADMIN)'
+                  : user?.role === 'DOCTOR'
+                  ? 'Bác sĩ (DOCTOR)'
+                  : 'Bệnh nhân (PATIENT)'}
+              </Text>
             </View>
-            <Text style={styles.userName}>
-              {user?.full_name || 'Quản trị viên'}
-            </Text>
-          </View>
+          </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.logoutButton}
@@ -318,6 +419,33 @@ export function AdminMoreView({
             <View style={styles.modalBox}>
               <Text style={styles.modalTitle}>Thông tin cá nhân</Text>
               <Divider style={{ marginVertical: 12 }} />
+
+              {/* Profile Avatar Upload */}
+              <View style={styles.profileAvatarBox}>
+                <Image
+                  source={{
+                    uri:
+                      user?.avatar ||
+                      'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
+                  }}
+                  style={styles.profileAvatarImg}
+                />
+                <TouchableOpacity
+                  style={styles.profileAvatarBtn}
+                  onPress={handleUploadMyAvatar}
+                  disabled={uploadingAvatar}
+                  activeOpacity={0.8}>
+                  <MaterialCommunityIcons
+                    name="camera"
+                    size={16}
+                    color="#FFFFFF"
+                  />
+                  <Text style={styles.profileAvatarBtnText}>
+                    {uploadingAvatar ? 'Đang tải ảnh...' : 'Đổi ảnh đại diện'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
               <Text style={styles.infoLabel}>👤 Họ và tên: <Text style={styles.infoValue}>{user?.full_name || 'Quản trị viên'}</Text></Text>
               <Text style={styles.infoLabel}>✉️ Email: <Text style={styles.infoValue}>{user?.email || 'admin@youmed.vn'}</Text></Text>
               <Text style={styles.infoLabel}>📞 Điện thoại: <Text style={styles.infoValue}>{user?.phone || 'Chưa cập nhật'}</Text></Text>
@@ -820,5 +948,50 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#1E293B',
+  },
+
+  // Avatar & Profile styles
+  circleAvatarImg: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 2,
+    borderColor: '#0284C7',
+  },
+  userRoleSubtitle: {
+    fontSize: 11,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  profileAvatarBox: {
+    alignItems: 'center',
+    marginBottom: 16,
+    padding: 12,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  profileAvatarImg: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    borderWidth: 3,
+    borderColor: '#0284C7',
+    marginBottom: 10,
+  },
+  profileAvatarBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#0284C7',
+    paddingVertical: 7,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+  },
+  profileAvatarBtnText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '700',
   },
 });

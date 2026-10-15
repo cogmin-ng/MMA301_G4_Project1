@@ -422,9 +422,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#EDF5FA',
   },
   content: {
+    width: '100%',
+    maxWidth: 1100,
+    alignSelf: 'center',
     paddingHorizontal: Spacing.three,
     paddingTop: 10,
-    paddingBottom: 90,
+    paddingBottom: 120,
   },
 
   // Top Header
