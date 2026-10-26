@@ -9,6 +9,7 @@ import {
   ScrollView,
   TouchableOpacity,
 } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuth } from '@/context/auth-context';
 import { LoginView } from '@/components/auth/login-view';
 import { RegisterView } from '@/components/auth/register-view';
@@ -18,6 +19,7 @@ import { HospitalListView } from '@/components/admin/hospital-list-view';
 import { AdminMoreView } from '@/components/admin/admin-more-view';
 import { UserRbacView } from '@/components/admin/user-rbac-view';
 import { AdminBottomBar } from '@/components/admin/admin-bottom-bar';
+import { PatientAppContainer } from '@/components/patient/patient-app-container';
 import { dashboardService } from '@/services/dashboard-service';
 import { MedicalColors, Spacing } from '@/constants/theme';
 
@@ -74,23 +76,32 @@ export default function AppEntryScreen() {
     );
   }
 
-  // 2. Khi đăng nhập với vai trò DOCTOR hoặc PATIENT
-  if (!isAdmin) {
+  // 2. Khi đăng nhập với vai trò PATIENT: Hiển thị trọn vẹn 5 màn hình Stitch
+  if (user?.role === 'PATIENT') {
+    return (
+      <PatientAppContainer
+        user={user}
+        onLogout={logout}
+        onSwitchToAdmin={() => switchRole('ADMIN')}
+      />
+    );
+  }
+
+  // 3. Khi đăng nhập với vai trò DOCTOR
+  if (isDoctor) {
     return (
       <SafeAreaView style={styles.safeContainer}>
         <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
         <View style={styles.nonAdminContainer}>
           <View style={styles.nonAdminCard}>
             <MaterialCommunityIcons
-              name={isDoctor ? 'doctor' : 'account-circle-outline'}
+              name="doctor"
               size={56}
-              color={isDoctor ? '#0284C7' : '#059669'}
+              color="#0284C7"
               style={{ marginBottom: 12 }}
             />
             <View style={styles.nonAdminBadge}>
-              <Text style={styles.nonAdminBadgeText}>
-                {isDoctor ? 'VAI TRÒ: BÁC SĨ' : 'VAI TRÒ: BỆNH NHÂN'}
-              </Text>
+              <Text style={styles.nonAdminBadgeText}>VAI TRÒ: BÁC SĨ</Text>
             </View>
             <Text style={styles.nonAdminName}>{user.full_name}</Text>
             <Text style={styles.nonAdminEmail}>{user.email}</Text>
@@ -98,9 +109,7 @@ export default function AppEntryScreen() {
             <View style={styles.divider} />
 
             <Text style={styles.nonAdminNotice}>
-              {isDoctor
-                ? 'Giao diện Bác sĩ: Quản lý lịch hẹn khám, thiết lập khung giờ và theo dõi ca trực.'
-                : 'Giao diện Bệnh nhân: Tìm kiếm cơ sở y tế, đặt lịch hẹn và theo dõi hồ sơ khám bệnh.'}
+              Giao diện Bác sĩ: Quản lý lịch hẹn khám, thiết lập khung giờ và theo dõi ca trực.
             </Text>
 
             <TouchableOpacity
@@ -108,6 +117,14 @@ export default function AppEntryScreen() {
               onPress={() => switchRole('ADMIN')}>
               <Text style={styles.switchBackAdminText}>
                 Quay về giao diện Quản trị viên
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.switchBackAdminBtn, { backgroundColor: '#E0F2FE', marginTop: 10 }]}
+              onPress={() => switchRole('PATIENT')}>
+              <Text style={[styles.switchBackAdminText, { color: '#0369A1' }]}>
+                Trải nghiệm giao diện Bệnh nhân (5 màn hình)
               </Text>
             </TouchableOpacity>
 
@@ -120,7 +137,7 @@ export default function AppEntryScreen() {
     );
   }
 
-  // 3. PHÂN HỆ QUẢN TRỊ VIÊN (Role: ADMIN) - Giao diện chuẩn 5 Tab y tế
+  // 4. PHÂN HỆ QUẢN TRỊ VIÊN (Role: ADMIN) - Giao diện chuẩn 5 Tab y tế
   return (
     <SafeAreaView style={styles.safeContainer}>
       <StatusBar barStyle="dark-content" backgroundColor="#EDF5FA" />

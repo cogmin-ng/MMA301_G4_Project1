@@ -5,36 +5,54 @@ const pool = require('../db');
 // GET /api/hospitals (Tìm kiếm, lọc tỉnh thành, trạng thái)
 router.get('/', async (req, res) => {
   try {
-    const { keyword, province, status } = req.query;
+    const keyword = typeof req.query.keyword === 'string' ? req.query.keyword.trim() : '';
+    const province = typeof req.query.province === 'string' ? req.query.province : '';
+    const status = typeof req.query.status === 'string' ? req.query.status : '';
 
-    let sql = `
-      SELECT h.*, COUNT(dh.doctor_id) AS doctor_count 
-      FROM hospitals h 
-      LEFT JOIN doctor_hospitals dh ON h.id = dh.hospital_id 
-      WHERE 1=1
-    `;
+    const conditions = ['1 = 1'];
     const params = [];
 
-    if (keyword && keyword.trim()) {
-      sql += ` AND (h.name LIKE ? OR h.address LIKE ? OR h.district LIKE ?)`;
-      const kw = `%${keyword.trim()}%`;
+    if (keyword) {
+      conditions.push('(h.name LIKE ? OR h.address LIKE ? OR h.district LIKE ?)');
+      const kw = `%${keyword}%`;
       params.push(kw, kw, kw);
     }
 
     if (province && province !== 'Tất cả' && province !== 'ALL') {
-      sql += ` AND h.province = ?`;
+      conditions.push('h.province = ?');
       params.push(province);
     }
 
     if (status && status !== 'ALL') {
-      sql += ` AND h.status = ?`;
+      conditions.push('h.status = ?');
       params.push(status);
     }
 
-    sql += ` GROUP BY h.id ORDER BY h.id DESC`;
-
-    const [rows] = await pool.query(sql, params);
-    return res.json(rows);
+    const [rows] = await pool.query(
+      `SELECT
+         h.*,
+         (SELECT COUNT(DISTINCT dh.doctor_id)
+          FROM doctor_hospitals dh
+          WHERE dh.hospital_id = h.id) AS doctor_count,
+         (SELECT GROUP_CONCAT(DISTINCT s.name ORDER BY s.name SEPARATOR ', ')
+          FROM doctor_hospitals dh
+          JOIN doctor_profiles dp ON dp.id = dh.doctor_id AND dp.status = 'ACTIVE'
+          JOIN users u ON u.id = dp.user_id AND u.is_active = 1
+          JOIN doctor_specialties ds ON ds.doctor_id = dp.id
+          JOIN specialties s ON s.id = ds.specialty_id
+          WHERE dh.hospital_id = h.id) AS specialty_names
+       FROM hospitals h
+       WHERE ${conditions.join(' AND ')}
+       ORDER BY h.id DESC`,
+      params
+    );
+    return res.json(rows.map((hospital) => ({
+      ...hospital,
+      doctor_count: Number(hospital.doctor_count),
+      specialties: hospital.specialty_names
+        ? hospital.specialty_names.split(', ').filter(Boolean)
+        : [],
+    })));
   } catch (err) {
     console.error('Lỗi lấy danh sách bệnh viện:', err);
     return res.status(500).json({ error: 'Lỗi truy vấn danh sách bệnh viện từ MySQL.' });
@@ -59,11 +77,13 @@ router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const [rows] = await pool.query(
-      `SELECT h.*, COUNT(dh.doctor_id) AS doctor_count 
-       FROM hospitals h 
-       LEFT JOIN doctor_hospitals dh ON h.id = dh.hospital_id 
-       WHERE h.id = ? 
-       GROUP BY h.id`,
+      `SELECT
+         h.*,
+         (SELECT COUNT(DISTINCT dh.doctor_id)
+          FROM doctor_hospitals dh
+          WHERE dh.hospital_id = h.id) AS doctor_count
+       FROM hospitals h
+       WHERE h.id = ?`,
       [id]
     );
 
@@ -71,7 +91,75 @@ router.get('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Không tìm thấy bệnh viện trên MySQL.' });
     }
 
-    return res.json(rows[0]);
+    const hospital = rows[0];
+
+    // Lấy danh sách bác sĩ thuộc bệnh viện này
+    const [doctors] = await pool.query(
+      `SELECT
+        dp.id,
+        dp.user_id,
+        u.full_name,
+        u.avatar,
+        u.phone,
+        u.email,
+        dp.qualification,
+        dp.experience_years,
+        dp.biography,
+        dp.status,
+        (SELECT GROUP_CONCAT(DISTINCT s.name ORDER BY s.name SEPARATOR ', ')
+         FROM doctor_specialties ds
+         JOIN specialties s ON s.id = ds.specialty_id
+         WHERE ds.doctor_id = dp.id) AS specialty_names,
+        dh.room_number,
+        dh.consultation_fee
+       FROM doctor_hospitals dh
+       JOIN doctor_profiles dp ON dh.doctor_id = dp.id
+       JOIN users u ON dp.user_id = u.id
+       WHERE dh.hospital_id = ? AND dp.status = 'ACTIVE' AND u.is_active = 1
+       ORDER BY dp.id`,
+      [id]
+    );
+
+    const [specialties] = await pool.query(
+      `SELECT DISTINCT s.name
+       FROM doctor_hospitals dh
+       JOIN doctor_profiles dp ON dp.id = dh.doctor_id AND dp.status = 'ACTIVE'
+       JOIN users u ON u.id = dp.user_id AND u.is_active = 1
+       JOIN doctor_specialties ds ON ds.doctor_id = dp.id
+       JOIN specialties s ON s.id = ds.specialty_id
+       WHERE dh.hospital_id = ?
+       ORDER BY s.name`,
+      [id]
+    );
+    const [workingHours] = await pool.query(
+      `SELECT day_of_week, open_time, close_time, is_closed
+       FROM hospital_working_hours
+       WHERE hospital_id = ?
+       ORDER BY day_of_week`,
+      [id]
+    );
+
+    hospital.doctor_count = Number(hospital.doctor_count);
+    hospital.doctors = doctors.map((d) => ({
+      id: d.id,
+      user_id: d.user_id,
+      full_name: d.full_name,
+      avatar: d.avatar,
+      phone: d.phone,
+      email: d.email,
+      qualification: d.qualification,
+      experience_years: d.experience_years,
+      biography: d.biography,
+      status: d.status,
+      specialty: d.specialty_names || null,
+      specialties: d.specialty_names ? d.specialty_names.split(', ').filter(Boolean) : [],
+      room_number: d.room_number,
+      consultation_fee: d.consultation_fee === null ? null : Number(d.consultation_fee),
+    }));
+    hospital.specialties = specialties.map((specialty) => specialty.name);
+    hospital.working_hours = workingHours;
+
+    return res.json(hospital);
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }

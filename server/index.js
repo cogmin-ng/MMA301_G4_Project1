@@ -1,9 +1,11 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 
-const path = require('path');
+const pool = require('./db');
 const authRoutes = require('./routes/auth');
 const hospitalRoutes = require('./routes/hospitals');
+const doctorRoutes = require('./routes/doctors');
 const dashboardRoutes = require('./routes/dashboard');
 const uploadRoutes = require('./routes/upload');
 
@@ -17,16 +19,21 @@ app.use(express.urlencoded({ extended: true, limit: '20mb' }));
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/hospitals', hospitalRoutes);
+app.use('/api/doctors', doctorRoutes);
 app.use('/api/admin/dashboard', dashboardRoutes);
 app.use('/api/upload', uploadRoutes);
 
 // Root healthcheck
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'OK', message: 'Medical Booking Backend is running and connected to MySQL.' });
+app.get('/api/health', async (req, res) => {
+  try {
+    await pool.query('SELECT 1');
+    return res.json({ status: 'OK', database: 'connected' });
+  } catch (err) {
+    console.error('MySQL health check failed:', err);
+    return res.status(503).json({ status: 'ERROR', database: 'disconnected' });
+  }
 });
 
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 Medical Booking API Server is running on http://localhost:${PORT}`);
-  console.log(`📊 Connected to MySQL database 'medical_booking'`);
+  console.log(`Medical Booking API server is running on port ${PORT}`);
 });
-
