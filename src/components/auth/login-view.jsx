@@ -16,7 +16,7 @@ import { useAuth } from '@/context/auth-context';
 import { MedicalColors, Spacing } from '@/constants/theme';
 
 export function LoginView({ onNavigateToRegister, onLoginSuccess }) {
-  const { login, switchRole, isLoading } = useAuth();
+  const { login, isLoading } = useAuth();
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -135,9 +135,9 @@ export function LoginView({ onNavigateToRegister, onLoginSuccess }) {
                     borderWidth: 1,
                     borderColor: '#BFDBFE',
                   }}
-                  onPress={() => switchRole('PATIENT')}>
+                  onPress={() => { setIdentifier('minh.patient@gmail.com'); setPassword('123456'); setErrorMsg('Vui lòng nhấn Đăng nhập để xác thực tài khoản demo.'); }}>
                   <Text style={{ fontSize: 13, fontWeight: '700', color: '#1D4ED8' }}>
-                    👤 Bệnh nhân (5 Màn hình)
+                    👤 Điền tài khoản bệnh nhân
                   </Text>
                 </TouchableOpacity>
 
@@ -151,12 +151,17 @@ export function LoginView({ onNavigateToRegister, onLoginSuccess }) {
                     borderWidth: 1,
                     borderColor: '#CBD5E1',
                   }}
-                  onPress={() => switchRole('ADMIN')}>
+                  onPress={() => { setIdentifier('admin@youmed.vn'); setPassword('123456'); setErrorMsg('Vui lòng nhấn Đăng nhập để xác thực tài khoản demo.'); }}>
                   <Text style={{ fontSize: 13, fontWeight: '700', color: '#334155' }}>
-                    🛡️ Quản trị viên
+                    🛡️ Điền tài khoản admin
                   </Text>
                 </TouchableOpacity>
               </View>
+              <TouchableOpacity
+                style={{ backgroundColor: '#ECFDF5', paddingVertical: 10, borderRadius: 12, alignItems: 'center', borderWidth: 1, borderColor: '#A7F3D0', marginTop: 9 }}
+                onPress={() => { setIdentifier('doctor.giang@youmed.vn'); setPassword('123456'); setErrorMsg('Vui lòng nhấn Đăng nhập để xác thực tài khoản bác sĩ demo.'); }}>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: '#047857' }}>🩺 Điền tài khoản bác sĩ</Text>
+              </TouchableOpacity>
             </View>
           </View>
         </Card.Content>

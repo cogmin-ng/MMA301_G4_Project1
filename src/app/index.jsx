@@ -6,8 +6,6 @@ import {
   SafeAreaView,
   StatusBar,
   ActivityIndicator,
-  ScrollView,
-  TouchableOpacity,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuth } from '@/context/auth-context';
@@ -20,11 +18,12 @@ import { AdminMoreView } from '@/components/admin/admin-more-view';
 import { UserRbacView } from '@/components/admin/user-rbac-view';
 import { AdminBottomBar } from '@/components/admin/admin-bottom-bar';
 import { PatientAppContainer } from '@/components/patient/patient-app-container';
+import { DoctorPortalView } from '@/components/doctor/doctor-portal-view';
 import { dashboardService } from '@/services/dashboard-service';
 import { MedicalColors, Spacing } from '@/constants/theme';
 
 export default function AppEntryScreen() {
-  const { user, isAuthenticated, isAdmin, isDoctor, isLoading, logout, switchRole } =
+  const { user, isAuthenticated, isAdmin, isDoctor, isLoading, logout } =
     useAuth();
 
   // Auth toggle
@@ -33,7 +32,6 @@ export default function AppEntryScreen() {
   // Admin Navigation Tab
   const [currentTab, setCurrentTab] = useState('HOME');
   const [autoOpenCreateHospital, setAutoOpenCreateHospital] = useState(false);
-  const [showRbacView, setShowRbacView] = useState(false);
 
   // Live Stats from system
   const [stats, setStats] = useState(null);
@@ -82,61 +80,17 @@ export default function AppEntryScreen() {
       <PatientAppContainer
         user={user}
         onLogout={logout}
-        onSwitchToAdmin={() => switchRole('ADMIN')}
       />
     );
   }
 
-  // 3. Khi đăng nhập với vai trò DOCTOR
+  // 3. Doctor workspace
   if (isDoctor) {
-    return (
-      <SafeAreaView style={styles.safeContainer}>
-        <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
-        <View style={styles.nonAdminContainer}>
-          <View style={styles.nonAdminCard}>
-            <MaterialCommunityIcons
-              name="doctor"
-              size={56}
-              color="#0284C7"
-              style={{ marginBottom: 12 }}
-            />
-            <View style={styles.nonAdminBadge}>
-              <Text style={styles.nonAdminBadgeText}>VAI TRÒ: BÁC SĨ</Text>
-            </View>
-            <Text style={styles.nonAdminName}>{user.full_name}</Text>
-            <Text style={styles.nonAdminEmail}>{user.email}</Text>
-
-            <View style={styles.divider} />
-
-            <Text style={styles.nonAdminNotice}>
-              Giao diện Bác sĩ: Quản lý lịch hẹn khám, thiết lập khung giờ và theo dõi ca trực.
-            </Text>
-
-            <TouchableOpacity
-              style={styles.switchBackAdminBtn}
-              onPress={() => switchRole('ADMIN')}>
-              <Text style={styles.switchBackAdminText}>
-                Quay về giao diện Quản trị viên
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.switchBackAdminBtn, { backgroundColor: '#E0F2FE', marginTop: 10 }]}
-              onPress={() => switchRole('PATIENT')}>
-              <Text style={[styles.switchBackAdminText, { color: '#0369A1' }]}>
-                Trải nghiệm giao diện Bệnh nhân (5 màn hình)
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.logoutOutlineBtn} onPress={logout}>
-              <Text style={styles.logoutOutlineText}>Đăng xuất</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </SafeAreaView>
-    );
+    return <SafeAreaView style={styles.safeContainer}>
+      <StatusBar barStyle="dark-content" backgroundColor="#F4F8FC" />
+      <DoctorPortalView user={user} onLogout={logout} />
+    </SafeAreaView>;
   }
-
   // 4. PHÂN HỆ QUẢN TRỊ VIÊN (Role: ADMIN) - Giao diện chuẩn 5 Tab y tế
   return (
     <SafeAreaView style={styles.safeContainer}>

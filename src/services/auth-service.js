@@ -131,20 +131,25 @@ class AuthService {
   }
 
   async switchAccountByRole(role) {
-    const users = await this.getAvailableUsers();
-    const matched = users.find((u) => u.role === role && u.is_active);
-    if (!matched) {
-      throw new Error(`Không tìm thấy tài khoản vai trò ${role} đang hoạt động.`);
-    }
-    this.currentUser = matched;
-    this.token = `jwt-${matched.id}-${matched.role.toLowerCase()}-${Date.now()}`;
-    return matched;
+    const response = await fetch(`${API_BASE_URL}/auth/switch-role`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', ...(this.token ? { Authorization: `Bearer ${this.token}` } : {}) },
+      body: JSON.stringify({ role }),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Không thể chuyển vai trò.');
+    this.currentUser = data.user; this.token = data.token;
+    return data.user;
   }
 
   async switchAccountToUser(user) {
-    this.currentUser = user;
-    this.token = `jwt-${user.id}-${user.role.toLowerCase()}-${Date.now()}`;
-    return user;
+    const response = await fetch(`${API_BASE_URL}/auth/switch-user`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', ...(this.token ? { Authorization: `Bearer ${this.token}` } : {}) },
+      body: JSON.stringify({ user_id: user.id }),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Không thể đăng nhập kiểm thử tài khoản.');
+    this.currentUser = data.user; this.token = data.token;
+    return data.user;
   }
 
   async updateAvatar(userId, avatar) {

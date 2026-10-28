@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../db');
+const { signToken, authenticate, requireRole, verifyPassword, hashPassword } = require('../auth');
 
 // POST /api/auth/login
 router.post('/login', async (req, res) => {
@@ -12,7 +13,7 @@ router.post('/login', async (req, res) => {
 
     const cleanId = identifier.trim().toLowerCase();
     const [rows] = await pool.query(
-      `SELECT id, full_name, email, phone, role, avatar, is_active, created_at, updated_at 
+      `SELECT id, full_name, email, phone, password, role, avatar, is_active, created_at, updated_at
        FROM users 
        WHERE LOWER(email) = ? OR phone = ? LIMIT 1`,
       [cleanId, identifier.trim()]
@@ -26,8 +27,14 @@ router.post('/login', async (req, res) => {
     if (!user.is_active) {
       return res.status(403).json({ error: 'Tài khoản của bạn đã bị khóa. Vui lòng liên hệ Admin.' });
     }
-
-    const token = `jwt-${user.id}-${user.role.toLowerCase()}-${Date.now()}`;
+    if (!password || !(await verifyPassword(password, user.password))) {
+      return res.status(401).json({ error: 'Email, số điện thoại hoặc mật khẩu không chính xác.' });
+    }
+    if (!user.password.startsWith('scrypt$')) {
+      await pool.query('UPDATE users SET password=? WHERE id=?', [await hashPassword(password), user.id]);
+    }
+    const token = signToken(user);
+    delete user.password;
     return res.json({
       message: 'Đăng nhập thành công từ MySQL',
       token,
@@ -60,7 +67,7 @@ router.post('/register', async (req, res) => {
     const [result] = await pool.query(
       `INSERT INTO users (full_name, email, phone, password, role, is_active, avatar) 
        VALUES (?, ?, ?, ?, 'PATIENT', TRUE, 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150')`,
-      [full_name.trim(), email.trim().toLowerCase(), phone?.trim() || null, password]
+      [full_name.trim(), email.trim().toLowerCase(), phone?.trim() || null, await hashPassword(password)]
     );
 
     const newUserId = result.insertId;
@@ -81,6 +88,25 @@ router.post('/register', async (req, res) => {
     console.error('Lỗi register:', err);
     return res.status(500).json({ error: 'Không thể tạo tài khoản trên MySQL.' });
   }
+});
+
+// Role preview is limited to an authenticated administrator and returns a signed session.
+router.post('/switch-role', authenticate, requireRole('ADMIN'), async (req, res) => {
+  try {
+    const { role } = req.body;
+    if (!['ADMIN', 'DOCTOR', 'PATIENT'].includes(role)) return res.status(400).json({ error: 'Vai trò không hợp lệ.' });
+    const [users] = await pool.query('SELECT id,full_name,email,phone,role,avatar,is_active FROM users WHERE role=? AND is_active=1 ORDER BY id LIMIT 1', [role]);
+    if (!users.length) return res.status(404).json({ error: `Không tìm thấy tài khoản ${role} đang hoạt động.` });
+    res.json({ user: users[0], token: signToken(users[0]) });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+router.post('/switch-user', authenticate, requireRole('ADMIN'), async (req, res) => {
+  try {
+    const [users] = await pool.query('SELECT id,full_name,email,phone,role,avatar,is_active FROM users WHERE id=? AND is_active=1 LIMIT 1', [req.body.user_id]);
+    if (!users.length) return res.status(404).json({ error: 'Không tìm thấy tài khoản đang hoạt động.' });
+    res.json({ user: users[0], token: signToken(users[0]) });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // GET /api/auth/users (Lấy danh sách người dùng & phân quyền)
@@ -187,7 +213,7 @@ router.post('/users', async (req, res) => {
     const [result] = await pool.query(
       `INSERT INTO users (full_name, email, phone, password, role, is_active, avatar)
        VALUES (?, ?, ?, ?, ?, TRUE, ?)`,
-      [full_name.trim(), email.trim().toLowerCase(), phone?.trim() || null, password, role, defaultAvatar]
+      [full_name.trim(), email.trim().toLowerCase(), phone?.trim() || null, await hashPassword(password), role, defaultAvatar]
     );
 
     const newId = result.insertId;

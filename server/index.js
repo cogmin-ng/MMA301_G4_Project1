@@ -8,6 +8,7 @@ const hospitalRoutes = require('./routes/hospitals');
 const doctorRoutes = require('./routes/doctors');
 const dashboardRoutes = require('./routes/dashboard');
 const uploadRoutes = require('./routes/upload');
+const doctorPortalRoutes = require('./routes/doctor-portal');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -20,6 +21,7 @@ app.use(express.urlencoded({ extended: true, limit: '20mb' }));
 app.use('/api/auth', authRoutes);
 app.use('/api/hospitals', hospitalRoutes);
 app.use('/api/doctors', doctorRoutes);
+app.use('/api/doctor-portal', doctorPortalRoutes);
 app.use('/api/admin/dashboard', dashboardRoutes);
 app.use('/api/upload', uploadRoutes);
 
