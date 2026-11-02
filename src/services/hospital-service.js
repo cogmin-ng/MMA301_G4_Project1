@@ -1,5 +1,20 @@
 import { API_BASE_URL } from './api-config';
 
+const readResponse = async (response, defaultMessage) => {
+  let data;
+  try {
+    data = await response.json();
+  } catch {
+    throw new Error(defaultMessage);
+  }
+
+  if (!response.ok) {
+    throw new Error(data?.error || defaultMessage);
+  }
+
+  return data;
+};
+
 class HospitalService {
   async getHospitals(params = {}) {
     const query = new URLSearchParams();
@@ -11,82 +26,53 @@ class HospitalService {
       query.append('status', params.status);
     }
 
-    const res = await fetch(`${API_BASE_URL}/hospitals?${query.toString()}`);
-    if (!res.ok) {
-      throw new Error('Lỗi lấy danh sách cơ sở y tế.');
-    }
-    return await res.json();
+    const response = await fetch(`${API_BASE_URL}/hospitals?${query.toString()}`);
+    return readResponse(response, 'Không thể tải danh sách cơ sở y tế từ máy chủ.');
   }
 
   async getHospitalById(id) {
-    const res = await fetch(`${API_BASE_URL}/hospitals/${id}`);
-    if (!res.ok) {
-      throw new Error('Không tìm thấy cơ sở y tế.');
-    }
-    return await res.json();
+    const response = await fetch(`${API_BASE_URL}/hospitals/${encodeURIComponent(id)}`);
+    return readResponse(response, 'Không thể tải thông tin cơ sở y tế từ máy chủ.');
   }
 
   async createHospital(data) {
-    const res = await fetch(`${API_BASE_URL}/hospitals`, {
+    const response = await fetch(`${API_BASE_URL}/hospitals`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     });
-
-    const resData = await res.json();
-    if (!res.ok) {
-      throw new Error(resData.error || 'Lỗi thêm cơ sở y tế.');
-    }
-    return resData.hospital;
+    const result = await readResponse(response, 'Lỗi thêm cơ sở y tế.');
+    return result.hospital;
   }
 
   async updateHospital(id, data) {
-    const res = await fetch(`${API_BASE_URL}/hospitals/${id}`, {
+    const response = await fetch(`${API_BASE_URL}/hospitals/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     });
-
-    const resData = await res.json();
-    if (!res.ok) {
-      throw new Error(resData.error || 'Lỗi cập nhật cơ sở y tế.');
-    }
-    return resData.hospital;
+    const result = await readResponse(response, 'Lỗi cập nhật cơ sở y tế.');
+    return result.hospital;
   }
 
   async toggleHospitalStatus(id) {
-    const res = await fetch(`${API_BASE_URL}/hospitals/${id}/status`, {
+    const response = await fetch(`${API_BASE_URL}/hospitals/${id}/status`, {
       method: 'PATCH',
     });
-
-    const resData = await res.json();
-    if (!res.ok) {
-      throw new Error(resData.error || 'Lỗi đổi trạng thái cơ sở y tế.');
-    }
-    return resData.hospital;
+    const result = await readResponse(response, 'Lỗi đổi trạng thái cơ sở y tế.');
+    return result.hospital;
   }
 
   async deleteHospital(id) {
-    const res = await fetch(`${API_BASE_URL}/hospitals/${id}`, {
+    const response = await fetch(`${API_BASE_URL}/hospitals/${id}`, {
       method: 'DELETE',
     });
-
-    const resData = await res.json();
-    if (!res.ok) {
-      throw new Error(resData.error || 'Lỗi xóa cơ sở y tế.');
-    }
+    await readResponse(response, 'Lỗi xóa cơ sở y tế.');
   }
 
   async getProvinces() {
-    try {
-      const res = await fetch(`${API_BASE_URL}/hospitals/meta/provinces`);
-      if (res.ok) {
-        return await res.json();
-      }
-    } catch (err) {
-      console.warn('Lỗi lấy danh mục tỉnh thành:', err);
-    }
-    return ['Hồ Chí Minh', 'Hà Nội', 'Đà Nẵng', 'Cần Thơ'];
+    const response = await fetch(`${API_BASE_URL}/hospitals/meta/provinces`);
+    return readResponse(response, 'Không thể tải danh sách tỉnh/thành từ máy chủ.');
   }
 }
 

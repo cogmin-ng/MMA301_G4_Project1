@@ -21,6 +21,8 @@ import { MedicalColors, Spacing } from '@/constants/theme';
 
 export function AdminMoreView({
   onNavigateToHospitals,
+  onNavigateToDoctors,
+  onNavigateToAppointments,
   onNavigateToDashboard,
   onNavigateToRbac,
 }) {
@@ -206,8 +208,48 @@ export function AdminMoreView({
 
         <Divider style={styles.headerDivider} />
 
-        {/* 2. Danh sách Menu (8 hàng chuẩn 100% theo ảnh mẫu) */}
+        {/* 2. Danh sách Menu */}
         <View style={styles.menuList}>
+          {/* Quản lý Bác sĩ */}
+          <TouchableOpacity
+            style={styles.menuRow}
+            activeOpacity={0.7}
+            onPress={onNavigateToDoctors}>
+            <View style={styles.menuRowLeft}>
+              <MaterialCommunityIcons
+                name="doctor"
+                size={24}
+                color="#0284C7"
+                style={styles.menuIcon}
+              />
+              <Text style={[styles.menuTitle, { fontWeight: '700', color: '#0F172A' }]}>
+                Quản lý Bác sĩ (CRUD)
+              </Text>
+            </View>
+            <MaterialCommunityIcons name="chevron-right" size={20} color="#94A3B8" />
+          </TouchableOpacity>
+          <Divider style={styles.rowDivider} />
+
+          {/* Quản lý Lịch hẹn */}
+          <TouchableOpacity
+            style={styles.menuRow}
+            activeOpacity={0.7}
+            onPress={onNavigateToAppointments}>
+            <View style={styles.menuRowLeft}>
+              <MaterialCommunityIcons
+                name="calendar-clock"
+                size={24}
+                color="#16A34A"
+                style={styles.menuIcon}
+              />
+              <Text style={[styles.menuTitle, { fontWeight: '700', color: '#0F172A' }]}>
+                Quản lý Lịch hẹn (Xác nhận / Hủy)
+              </Text>
+            </View>
+            <MaterialCommunityIcons name="chevron-right" size={20} color="#94A3B8" />
+          </TouchableOpacity>
+          <Divider style={styles.rowDivider} />
+
           {/* Hàng 1: Thông tin toà nhà */}
           <TouchableOpacity
             style={styles.menuRow}

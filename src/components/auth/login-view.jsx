@@ -118,6 +118,46 @@ export function LoginView({ onNavigateToRegister, onLoginSuccess }) {
                 <Text style={styles.registerLink}>Đăng ký tài khoản</Text>
               </TouchableOpacity>
             </View>
+
+            {/* Quick Demo Access Buttons */}
+            <View style={{ marginTop: 20, paddingTop: 16, borderTopWidth: 1, borderTopColor: '#E2E8F0' }}>
+              <Text style={{ fontSize: 12, fontWeight: '700', color: '#64748B', textAlign: 'center', marginBottom: 10 }}>
+                TRẢI NGHIỆM NHANH HỆ THỐNG
+              </Text>
+              <View style={{ flexDirection: 'row', gap: 10 }}>
+                <TouchableOpacity
+                  style={{
+                    flex: 1,
+                    backgroundColor: '#EBF4FE',
+                    paddingVertical: 10,
+                    borderRadius: 12,
+                    alignItems: 'center',
+                    borderWidth: 1,
+                    borderColor: '#BFDBFE',
+                  }}
+                  onPress={() => switchRole('PATIENT')}>
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: '#1D4ED8' }}>
+                    👤 Bệnh nhân (5 Màn hình)
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={{
+                    flex: 1,
+                    backgroundColor: '#F1F5F9',
+                    paddingVertical: 10,
+                    borderRadius: 12,
+                    alignItems: 'center',
+                    borderWidth: 1,
+                    borderColor: '#CBD5E1',
+                  }}
+                  onPress={() => switchRole('ADMIN')}>
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: '#334155' }}>
+                    🛡️ Quản trị viên
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
           </View>
         </Card.Content>
       </Card>
