@@ -147,17 +147,6 @@ export function PatientHomeView({
           </View>
           <Text style={styles.categoryLabel}>Bệnh viện</Text>
         </TouchableOpacity>
-
-        {/* Chuyên khoa */}
-        <TouchableOpacity
-          style={styles.categoryItem}
-          onPress={() => onNavigateToDoctorList()}
-          activeOpacity={0.75}>
-          <View style={styles.categoryIconBox}>
-            <MaterialCommunityIcons name="microscope" size={26} color="#0891B2" />
-          </View>
-          <Text style={styles.categoryLabel}>Chuyên khoa</Text>
-        </TouchableOpacity>
       </View>
 
       {!!error && (
@@ -460,13 +449,13 @@ const styles = StyleSheet.create({
   },
   categoryGrid: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'space-around',
     marginTop: 16,
-    paddingHorizontal: 4,
+    paddingHorizontal: 24,
   },
   categoryItem: {
     alignItems: 'center',
-    width: 68,
+    width: 80,
   },
   categoryIconBox: {
     width: 54,
