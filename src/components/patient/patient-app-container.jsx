@@ -5,11 +5,14 @@ import { DoctorListView } from './doctor-list-view';
 import { HospitalListView } from './hospital-list-view';
 import { DoctorDetailView } from './doctor-detail-view';
 import { HospitalDetailView } from './hospital-detail-view';
+import { PatientProfileView } from './patient-profile-view';
 import { PatientBottomBar } from './patient-bottom-bar';
 
 export function PatientAppContainer({ user, onLogout, onSwitchToAdmin }) {
+  const [currentUser, setCurrentUser] = useState(user);
+
   // Screen stack & navigation state
-  // currentScreen: 'HOME' | 'DOCTOR_LIST' | 'HOSPITAL_LIST' | 'DOCTOR_DETAIL' | 'HOSPITAL_DETAIL'
+  // currentScreen: 'HOME' | 'DOCTOR_LIST' | 'HOSPITAL_LIST' | 'DOCTOR_DETAIL' | 'HOSPITAL_DETAIL' | 'PROFILE'
   const [currentScreen, setCurrentScreen] = useState('HOME');
   const [selectedDoctorId, setSelectedDoctorId] = useState(null);
   const [selectedHospitalId, setSelectedHospitalId] = useState(null);
@@ -43,6 +46,11 @@ export function PatientAppContainer({ user, onLogout, onSwitchToAdmin }) {
     setCurrentScreen('HOSPITAL_DETAIL');
   };
 
+  const navigateToProfile = () => {
+    setCurrentScreen('PROFILE');
+    setBottomTab('ACCOUNT');
+  };
+
   const handleBottomTabSelect = (tabKey) => {
     setBottomTab(tabKey);
     if (tabKey === 'HOME') {
@@ -52,8 +60,8 @@ export function PatientAppContainer({ user, onLogout, onSwitchToAdmin }) {
     }
   };
 
-  // Chỉ hiển thị BottomBar ở màn hình chính HOME
-  const showBottomBar = currentScreen === 'HOME';
+  // Hiển thị BottomBar ở màn hình HOME và PROFILE
+  const showBottomBar = currentScreen === 'HOME' || currentScreen === 'PROFILE';
 
   return (
     <SafeAreaView style={styles.safeContainer}>
@@ -63,7 +71,7 @@ export function PatientAppContainer({ user, onLogout, onSwitchToAdmin }) {
         {/* 1. Màn hình Home/Dashboard */}
         {currentScreen === 'HOME' && (
           <PatientHomeView
-            user={user}
+            user={currentUser}
             onNavigateToDoctorList={navigateToDoctorList}
             onNavigateToHospitalList={navigateToHospitalList}
             onNavigateToDoctorDetail={navigateToDoctorDetail}
@@ -110,15 +118,26 @@ export function PatientAppContainer({ user, onLogout, onSwitchToAdmin }) {
             onNavigateToDoctorDetail={navigateToDoctorDetail}
           />
         )}
+
+        {/* 6. Màn hình Patient Profile */}
+        {currentScreen === 'PROFILE' && (
+          <PatientProfileView
+            user={currentUser}
+            onLogout={onLogout}
+            onBack={navigateToHome}
+            onProfileUpdated={(updated) => setCurrentUser((prev) => ({ ...prev, ...updated }))}
+          />
+        )}
       </View>
 
-      {/* Fixed Bottom Navigation chuẩn Stitch YouMed */}
+      {/* Fixed Bottom Navigation */}
       {showBottomBar && (
         <PatientBottomBar
           currentTab={bottomTab}
           onSelectTab={handleBottomTabSelect}
           onLogout={onLogout}
           onSwitchToAdmin={onSwitchToAdmin}
+          onNavigateToProfile={navigateToProfile}
         />
       )}
     </SafeAreaView>
