@@ -22,6 +22,8 @@ export function AdminDrawerMenu({
   stats,
   onNavigateToHospitals,
   onOpenCreateHospital,
+  onNavigateToDoctors,
+  onNavigateToAppointments,
   onNavigateToDashboard,
   onNavigateToProfile,
   onNavigateToRbac,
@@ -129,12 +131,7 @@ export function AdminDrawerMenu({
 
             <TouchableOpacity
               style={styles.menuItem}
-              onPress={() =>
-                Alert.alert(
-                  'Quản lý Bác sĩ',
-                  `Có ${stats?.totalDoctors ?? 0} bác sĩ trong hệ thống.\nQuản lý danh sách bác sĩ và ca tiếp nhận bệnh nhân.`
-                )
-              }>
+              onPress={() => (onNavigateToDoctors ? handleMenuClick(onNavigateToDoctors) : onClose())}>
               <View style={[styles.menuIconBox, { backgroundColor: '#FEF3C7' }]}>
                 <MaterialCommunityIcons name="doctor" size={20} color="#D97706" />
               </View>
@@ -146,12 +143,7 @@ export function AdminDrawerMenu({
 
             <TouchableOpacity
               style={styles.menuItem}
-              onPress={() =>
-                Alert.alert(
-                  'Lịch hẹn khám bệnh',
-                  `Có ${stats?.totalAppointments ?? 0} ca khám bệnh đang được quản lý.`
-                )
-              }>
+              onPress={() => (onNavigateToAppointments ? handleMenuClick(onNavigateToAppointments) : onClose())}>
               <View style={[styles.menuIconBox, { backgroundColor: '#FEE2E2' }]}>
                 <MaterialCommunityIcons name="calendar-clock" size={20} color="#DC2626" />
               </View>

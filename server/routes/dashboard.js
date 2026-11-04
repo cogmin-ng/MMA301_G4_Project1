@@ -1,6 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../db');
+const { authenticate, requireRole } = require('../auth');
+
+router.use(authenticate, requireRole('ADMIN'));
 
 // GET /api/admin/dashboard (Lấy toàn bộ số liệu KPI & thống kê từ CSDL MySQL)
 router.get('/stats', async (req, res) => {

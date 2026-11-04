@@ -1,4 +1,5 @@
 import { API_BASE_URL } from './api-config';
+import { authHeaders } from './auth-headers';
 
 const readResponse = async (response, defaultMessage) => {
   let data;
@@ -38,7 +39,7 @@ class HospitalService {
   async createHospital(data) {
     const response = await fetch(`${API_BASE_URL}/hospitals`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(data),
     });
     const result = await readResponse(response, 'Lỗi thêm cơ sở y tế.');
@@ -48,7 +49,7 @@ class HospitalService {
   async updateHospital(id, data) {
     const response = await fetch(`${API_BASE_URL}/hospitals/${id}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(data),
     });
     const result = await readResponse(response, 'Lỗi cập nhật cơ sở y tế.');
@@ -57,7 +58,7 @@ class HospitalService {
 
   async toggleHospitalStatus(id) {
     const response = await fetch(`${API_BASE_URL}/hospitals/${id}/status`, {
-      method: 'PATCH',
+      method: 'PATCH', headers: authHeaders(),
     });
     const result = await readResponse(response, 'Lỗi đổi trạng thái cơ sở y tế.');
     return result.hospital;
@@ -65,7 +66,7 @@ class HospitalService {
 
   async deleteHospital(id) {
     const response = await fetch(`${API_BASE_URL}/hospitals/${id}`, {
-      method: 'DELETE',
+      method: 'DELETE', headers: authHeaders(),
     });
     await readResponse(response, 'Lỗi xóa cơ sở y tế.');
   }

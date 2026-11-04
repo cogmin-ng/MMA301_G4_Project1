@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Platform, Modal } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
-export function PatientBottomBar({ currentTab, onSelectTab, onLogout, onSwitchToAdmin }) {
+export function PatientBottomBar({ currentTab, onSelectTab, onLogout, onSwitchToAdmin, onNavigateToProfile }) {
   const [showAccountModal, setShowAccountModal] = useState(false);
 
   const tabs = [
@@ -71,19 +71,21 @@ export function PatientBottomBar({ currentTab, onSelectTab, onLogout, onSwitchTo
           <View style={styles.modalSheet}>
             <View style={styles.sheetHandle} />
             <Text style={styles.sheetTitle}>Tài khoản Bệnh nhân</Text>
-            <Text style={styles.sheetSub}>Tuỳ chọn quản lý và chuyển đổi quyền truy cập</Text>
+            <Text style={styles.sheetSub}>Tuỳ chọn quản lý và thông tin cá nhân</Text>
 
-            {onSwitchToAdmin && (
-              <TouchableOpacity
-                style={styles.sheetBtn}
-                onPress={() => {
-                  setShowAccountModal(false);
-                  onSwitchToAdmin();
-                }}>
-                <MaterialCommunityIcons name="shield-account" size={20} color="#0058BE" />
-                <Text style={styles.sheetBtnTextBlue}>Chuyển sang giao diện Admin</Text>
-              </TouchableOpacity>
-            )}
+            <TouchableOpacity
+              style={styles.sheetBtn}
+              onPress={() => {
+                setShowAccountModal(false);
+                if (onNavigateToProfile) {
+                  onNavigateToProfile();
+                } else {
+                  onSelectTab('PROFILE');
+                }
+              }}>
+              <MaterialCommunityIcons name="account-circle-outline" size={20} color="#0058BE" />
+              <Text style={styles.sheetBtnTextBlue}>Trang cá nhân</Text>
+            </TouchableOpacity>
 
             <TouchableOpacity
               style={[styles.sheetBtn, { borderColor: '#FEE2E2', backgroundColor: '#FFF5F5' }]}

@@ -1,0 +1,12 @@
+const router=require('express').Router();
+const authenticate=require('../middleware/auth');
+const requirePatient=require('../middleware/requirePatient');
+const c=require('../controllers/patientBookingController');
+router.use(authenticate,requirePatient);
+router.get('/hospitals',c.hospitals);
+router.get('/hospitals/:hospitalId/doctors',c.doctors);
+router.get('/doctors/:doctorId/slots',c.slots);
+router.post('/appointments',c.create);
+router.get('/appointments',c.history);
+router.patch('/appointments/:id/cancel',c.cancel);
+module.exports=router;

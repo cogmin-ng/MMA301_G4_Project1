@@ -14,7 +14,7 @@ function signToken(user) {
   return `${body}.${signature}`;
 }
 
-function authenticate(req, res, next) {
+async function authenticate(req, res, next) {
   try {
     const secret = process.env.JWT_SECRET;
     const token = req.headers.authorization?.match(/^Bearer\s+(.+)$/i)?.[1];
@@ -26,7 +26,11 @@ function authenticate(req, res, next) {
     if (actual.length !== expected.length || !crypto.timingSafeEqual(actual, expected)) return res.status(401).json({ error: 'Token không hợp lệ.' });
     const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString());
     if (!payload.sub || !payload.exp || payload.exp <= Date.now() / 1000) return res.status(401).json({ error: 'Phiên đăng nhập đã hết hạn.' });
-    req.auth = { userId: Number(payload.sub), role: payload.role };
+    const pool = require('./db');
+    const [users] = await pool.query('SELECT id,full_name,email,phone,role,avatar,is_active FROM users WHERE id=? LIMIT 1', [payload.sub]);
+    if (!users.length || !users[0].is_active) return res.status(401).json({ error: 'Tài khoản không tồn tại hoặc đã bị khóa.' });
+    req.auth = { userId: Number(payload.sub), role: users[0].role };
+    req.user = users[0];
     next();
   } catch { return res.status(401).json({ error: 'Token không hợp lệ.' }); }
 }
@@ -34,11 +38,8 @@ function authenticate(req, res, next) {
 function requireRole(...roles) {
   return async (req, res, next) => {
     try {
-      const pool = require('./db');
-      const [rows] = await pool.query('SELECT id, role, is_active FROM users WHERE id=? LIMIT 1', [req.auth.userId]);
-      if (!rows.length || !rows[0].is_active) return res.status(401).json({ error: 'Tài khoản không tồn tại hoặc đã bị khóa.' });
-      if (!roles.includes(rows[0].role)) return res.status(403).json({ error: 'Bạn không có quyền thực hiện thao tác này.' });
-      req.user = rows[0];
+      const user = req.user;
+      if (!user || !roles.includes(user.role)) return res.status(403).json({ error: 'Bạn không có quyền thực hiện thao tác này.' });
       next();
     } catch (err) { next(err); }
   };

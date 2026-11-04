@@ -7,13 +7,14 @@ import {
   StatusBar,
   ActivityIndicator,
 } from 'react-native';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuth } from '@/context/auth-context';
 import { LoginView } from '@/components/auth/login-view';
 import { RegisterView } from '@/components/auth/register-view';
 import { AdminHomeGrid } from '@/components/admin/admin-home-grid';
 import { AdminDashboardView } from '@/components/admin/admin-dashboard-view';
 import { HospitalListView } from '@/components/admin/hospital-list-view';
+import { DoctorManagementView } from '@/components/admin/doctor-management-view';
+import { AppointmentManagementView } from '@/components/admin/appointment-management-view';
 import { AdminMoreView } from '@/components/admin/admin-more-view';
 import { UserRbacView } from '@/components/admin/user-rbac-view';
 import { AdminBottomBar } from '@/components/admin/admin-bottom-bar';
@@ -32,6 +33,7 @@ export default function AppEntryScreen() {
   // Admin Navigation Tab
   const [currentTab, setCurrentTab] = useState('HOME');
   const [autoOpenCreateHospital, setAutoOpenCreateHospital] = useState(false);
+  const [autoOpenCreateDoctor, setAutoOpenCreateDoctor] = useState(false);
 
   // Live Stats from system
   const [stats, setStats] = useState(null);
@@ -110,6 +112,15 @@ export default function AppEntryScreen() {
               setAutoOpenCreateHospital(true);
               setCurrentTab('HOSPITALS');
             }}
+            onNavigateToDoctors={() => {
+              setAutoOpenCreateDoctor(false);
+              setCurrentTab('DOCTORS');
+            }}
+            onOpenCreateDoctor={() => {
+              setAutoOpenCreateDoctor(true);
+              setCurrentTab('DOCTORS');
+            }}
+            onNavigateToAppointments={() => setCurrentTab('APPOINTMENTS')}
             onNavigateToDashboard={() => setCurrentTab('DASHBOARD')}
             onNavigateToProfile={() => setCurrentTab('MORE')}
             onNavigateToRbac={() => setCurrentTab('RBAC')}
@@ -124,7 +135,20 @@ export default function AppEntryScreen() {
           />
         )}
 
-        {/* Tab 3: Thống kê & Dashboard */}
+        {/* Tab 3: Quản lý Bác sĩ (CRUD, List) */}
+        {currentTab === 'DOCTORS' && (
+          <DoctorManagementView
+            initialCreateOpen={autoOpenCreateDoctor}
+            onBackToHome={() => setCurrentTab('HOME')}
+          />
+        )}
+
+        {/* Tab 4: Quản lý Lịch hẹn (Xác nhận / Hủy, List, Detail) */}
+        {currentTab === 'APPOINTMENTS' && (
+          <AppointmentManagementView onBackToHome={() => setCurrentTab('HOME')} />
+        )}
+
+        {/* Tab: Thống kê & Dashboard */}
         {currentTab === 'DASHBOARD' && (
           <AdminDashboardView
             onNavigateToHospitals={() => {
@@ -138,7 +162,7 @@ export default function AppEntryScreen() {
           />
         )}
 
-        {/* Tab 4: Phân quyền vai trò (RBAC) */}
+        {/* Tab: Phân quyền vai trò (RBAC) */}
         {currentTab === 'RBAC' && (
           <UserRbacView onBackToHome={() => setCurrentTab('HOME')} />
         )}
@@ -147,6 +171,8 @@ export default function AppEntryScreen() {
         {currentTab === 'MORE' && (
           <AdminMoreView
             onNavigateToHospitals={() => setCurrentTab('HOSPITALS')}
+            onNavigateToDoctors={() => setCurrentTab('DOCTORS')}
+            onNavigateToAppointments={() => setCurrentTab('APPOINTMENTS')}
             onNavigateToDashboard={() => setCurrentTab('DASHBOARD')}
             onNavigateToRbac={() => setCurrentTab('RBAC')}
           />

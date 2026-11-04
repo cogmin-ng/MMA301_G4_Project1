@@ -6,7 +6,6 @@ import { MedicalColors } from '@/constants/theme';
 
 const DAYS = ['Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy', 'Chủ Nhật'];
 const STATUSES = [['ALL','Tất cả'],['PENDING','Chờ xác nhận'],['CONFIRMED','Đã xác nhận'],['REJECTED','Đã từ chối'],['COMPLETED','Hoàn thành']];
-const pad = (value) => String(value).padStart(2, '0');
 
 export function DoctorPortalView({ user, onLogout }) {
   const [tab, setTab] = useState('APPOINTMENTS');

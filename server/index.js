@@ -6,9 +6,11 @@ const pool = require('./db');
 const authRoutes = require('./routes/auth');
 const hospitalRoutes = require('./routes/hospitals');
 const doctorRoutes = require('./routes/doctors');
+const appointmentRoutes = require('./routes/appointments');
 const dashboardRoutes = require('./routes/dashboard');
 const uploadRoutes = require('./routes/upload');
 const doctorPortalRoutes = require('./routes/doctor-portal');
+const patientBookingRoutes = require('./routes/patientBookingRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -22,8 +24,10 @@ app.use('/api/auth', authRoutes);
 app.use('/api/hospitals', hospitalRoutes);
 app.use('/api/doctors', doctorRoutes);
 app.use('/api/doctor-portal', doctorPortalRoutes);
+app.use('/api/appointments', appointmentRoutes);
 app.use('/api/admin/dashboard', dashboardRoutes);
 app.use('/api/upload', uploadRoutes);
+app.use('/api/patient', patientBookingRoutes);
 
 // Root healthcheck
 app.get('/api/health', async (req, res) => {

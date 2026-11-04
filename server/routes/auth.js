@@ -110,7 +110,7 @@ router.post('/switch-user', authenticate, requireRole('ADMIN'), async (req, res)
 });
 
 // GET /api/auth/users (Lấy danh sách người dùng & phân quyền)
-router.get('/users', async (req, res) => {
+router.get('/users', authenticate, requireRole('ADMIN'), async (req, res) => {
   try {
     const { role, search } = req.query;
     let query = 'SELECT id, full_name, email, phone, role, avatar, is_active, created_at FROM users WHERE 1=1';
@@ -135,7 +135,7 @@ router.get('/users', async (req, res) => {
 });
 
 // PATCH /api/auth/users/:id/role (Phân quyền vai trò: ADMIN, DOCTOR, PATIENT)
-router.patch('/users/:id/role', async (req, res) => {
+router.patch('/users/:id/role', authenticate, requireRole('ADMIN'), async (req, res) => {
   try {
     const { id } = req.params;
     const { role } = req.body;
@@ -175,7 +175,7 @@ router.patch('/users/:id/role', async (req, res) => {
 });
 
 // PATCH /api/auth/users/:id/status (Khóa / Kích hoạt tài khoản)
-router.patch('/users/:id/status', async (req, res) => {
+router.patch('/users/:id/status', authenticate, requireRole('ADMIN'), async (req, res) => {
   try {
     const { id } = req.params;
     const [current] = await pool.query('SELECT is_active FROM users WHERE id = ?', [id]);
@@ -196,7 +196,7 @@ router.patch('/users/:id/status', async (req, res) => {
 });
 
 // POST /api/auth/users (Tạo tài khoản mới và chỉ định vai trò bởi Admin)
-router.post('/users', async (req, res) => {
+router.post('/users', authenticate, requireRole('ADMIN'), async (req, res) => {
   try {
     const { full_name, email, phone, password, role, avatar } = req.body;
     if (!full_name || !email || !password || !role) {
@@ -235,10 +235,11 @@ router.post('/users', async (req, res) => {
 });
 
 // PATCH /api/auth/users/:id/avatar (Cập nhật ảnh đại diện người dùng)
-router.patch('/users/:id/avatar', async (req, res) => {
+router.patch('/users/:id/avatar', authenticate, async (req, res) => {
   try {
     const { id } = req.params;
     const { avatar } = req.body;
+    if (Number(id) !== req.user.id && req.user.role !== 'ADMIN') return res.status(403).json({ error: 'Bạn không có quyền cập nhật ảnh này.' });
     if (!avatar) {
       return res.status(400).json({ error: 'Vui lòng cung cấp đường dẫn ảnh đại diện.' });
     }
@@ -248,6 +249,90 @@ router.patch('/users/:id/avatar', async (req, res) => {
     return res.json({ message: 'Cập nhật ảnh đại diện thành công.', user: rows[0] });
   } catch (err) {
     return res.status(500).json({ error: err.message });
+  }
+});
+
+// ===============================================
+// Patient Profile APIs (GET & PUT /api/auth/profile)
+// ===============================================
+// GET /api/auth/profile – Lấy thông tin cá nhân bệnh nhân đang đăng nhập
+router.get('/profile', authenticate, requireRole('PATIENT'), async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const [rows] = await pool.query(
+      `SELECT u.id, u.full_name, u.email, u.phone, u.avatar, u.role,
+              pp.date_of_birth, pp.gender, pp.address, pp.medical_history, pp.allergies
+       FROM users u
+       LEFT JOIN patient_profiles pp ON pp.user_id = u.id
+       WHERE u.id = ? LIMIT 1`,
+      [userId]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Không tìm thấy thông tin người dùng.' });
+    }
+
+    return res.json(rows[0]);
+  } catch (err) {
+    console.error('Lỗi GET /api/auth/profile:', err);
+    return res.status(500).json({ error: 'Lỗi máy chủ khi tải thông tin cá nhân.' });
+  }
+});
+
+// PUT /api/auth/profile – Cập nhật thông tin cá nhân bệnh nhân
+router.put('/profile', authenticate, requireRole('PATIENT'), async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { full_name, phone, date_of_birth, gender, address } = req.body;
+
+    // Cập nhật bảng users
+    const userFields = [];
+    const userValues = [];
+    if (full_name !== undefined) { userFields.push('full_name = ?'); userValues.push(full_name); }
+    if (phone !== undefined) { userFields.push('phone = ?'); userValues.push(phone); }
+
+    if (userFields.length > 0) {
+      userFields.push('updated_at = NOW()');
+      userValues.push(userId);
+      await pool.query(`UPDATE users SET ${userFields.join(', ')} WHERE id = ?`, userValues);
+    }
+
+    // Cập nhật bảng patient_profiles (upsert)
+    const profileFields = {};
+    if (date_of_birth !== undefined) profileFields.date_of_birth = date_of_birth || null;
+    if (gender !== undefined) profileFields.gender = gender || null;
+    if (address !== undefined) profileFields.address = address || null;
+
+    if (Object.keys(profileFields).length > 0) {
+      // Kiểm tra đã có profile chưa
+      const [existing] = await pool.query('SELECT id FROM patient_profiles WHERE user_id = ?', [userId]);
+      if (existing.length > 0) {
+        const setClauses = Object.keys(profileFields).map(k => `${k} = ?`);
+        const setValues = Object.values(profileFields);
+        setValues.push(userId);
+        await pool.query(`UPDATE patient_profiles SET ${setClauses.join(', ')} WHERE user_id = ?`, setValues);
+      } else {
+        profileFields.user_id = userId;
+        const cols = Object.keys(profileFields).join(', ');
+        const placeholders = Object.keys(profileFields).map(() => '?').join(', ');
+        await pool.query(`INSERT INTO patient_profiles (${cols}) VALUES (${placeholders})`, Object.values(profileFields));
+      }
+    }
+
+    // Trả về dữ liệu mới
+    const [updated] = await pool.query(
+      `SELECT u.id, u.full_name, u.email, u.phone, u.avatar, u.role,
+              pp.date_of_birth, pp.gender, pp.address, pp.medical_history, pp.allergies
+       FROM users u
+       LEFT JOIN patient_profiles pp ON pp.user_id = u.id
+       WHERE u.id = ? LIMIT 1`,
+      [userId]
+    );
+
+    return res.json({ message: 'Cập nhật thông tin cá nhân thành công.', profile: updated[0] });
+  } catch (err) {
+    console.error('Lỗi PUT /api/auth/profile:', err);
+    return res.status(500).json({ error: 'Lỗi máy chủ khi cập nhật thông tin cá nhân.' });
   }
 });
 

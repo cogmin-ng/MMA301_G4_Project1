@@ -46,6 +46,9 @@ export function AdminHomeGrid({
   stats,
   onNavigateToHospitals,
   onOpenCreateHospital,
+  onNavigateToDoctors,
+  onOpenCreateDoctor,
+  onNavigateToAppointments,
   onNavigateToDashboard,
   onNavigateToProfile,
   onNavigateToRbac,
@@ -186,12 +189,7 @@ export function AdminHomeGrid({
               iconName="doctor"
               iconColor="#D97706"
               bgColor="#FEF3C7"
-              onPress={() =>
-                Alert.alert(
-                  'Quản lý Bác sĩ',
-                  `Tổng số bác sĩ đang hoạt động: ${stats?.totalDoctors ?? 0}\nQuản lý hồ sơ chuyên khoa và danh sách bác sĩ tiếp nhận bệnh nhân.`
-                )
-              }
+              onPress={onNavigateToDoctors}
             />
 
             <PortalButton
@@ -201,12 +199,7 @@ export function AdminHomeGrid({
               iconName="calendar-clock"
               iconColor="#DC2626"
               bgColor="#FEE2E2"
-              onPress={() =>
-                Alert.alert(
-                  'Lịch hẹn khám bệnh',
-                  `Tổng số lịch hẹn khám: ${stats?.totalAppointments ?? 0}\nTheo dõi trạng thái duyệt lịch và tiến độ khám bệnh.`
-                )
-              }
+              onPress={onNavigateToAppointments}
             />
 
             <PortalButton
@@ -408,6 +401,8 @@ export function AdminHomeGrid({
         stats={stats}
         onNavigateToHospitals={onNavigateToHospitals}
         onOpenCreateHospital={onOpenCreateHospital}
+        onNavigateToDoctors={onNavigateToDoctors}
+        onNavigateToAppointments={onNavigateToAppointments}
         onNavigateToDashboard={onNavigateToDashboard}
         onNavigateToProfile={onNavigateToProfile}
         onNavigateToRbac={onNavigateToRbac}
