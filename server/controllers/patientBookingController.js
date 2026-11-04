@@ -24,6 +24,29 @@ const timeToMinutes = (value) => {
 };
 const minutesToTime = (value) => `${String(Math.floor(value / 60)).padStart(2, '0')}:${String(value % 60).padStart(2, '0')}:00`;
 
+async function ensureDefaultSchedules(db, doctorId, hospitalId) {
+  const [[existing]] = await db.query(
+    'SELECT COUNT(*) AS count FROM doctor_schedules WHERE doctor_id=? AND hospital_id=?',
+    [doctorId, hospitalId]
+  );
+  if (Number(existing?.count) > 0) return;
+
+  const [[linked]] = await db.query(
+    'SELECT id FROM doctor_hospitals WHERE doctor_id=? AND hospital_id=? LIMIT 1',
+    [doctorId, hospitalId]
+  );
+  if (!linked) return;
+
+  for (let day = 1; day <= 7; day++) {
+    await db.query(
+      `INSERT INTO doctor_schedules (doctor_id, hospital_id, day_of_week, start_time, end_time, slot_duration, is_active)
+       VALUES (?, ?, ?, '08:00:00', '11:30:00', 30, 1),
+              (?, ?, ?, '13:30:00', '17:00:00', 30, 1)`,
+      [doctorId, hospitalId, day, doctorId, hospitalId, day]
+    );
+  }
+}
+
 // GET /api/patient/hospitals
 exports.hospitals = async (_req, res) => {
   try {
@@ -37,14 +60,14 @@ exports.hospitals = async (_req, res) => {
 exports.doctors = async (req, res) => {
   try {
     const [rows] = await pool.query(`SELECT dp.id,u.full_name AS name,dp.experience_years,dp.qualification,
-        dp.biography,u.avatar,dh.consultation_fee,
+        dp.biography,u.avatar,dh.consultation_fee,dh.room_number,
         GROUP_CONCAT(DISTINCT s.name ORDER BY s.name SEPARATOR ', ') AS specialty
       FROM doctor_hospitals dh
       JOIN doctor_profiles dp ON dp.id=dh.doctor_id AND dp.status='ACTIVE'
       JOIN users u ON u.id=dp.user_id AND u.is_active=1
       LEFT JOIN doctor_specialties ds ON ds.doctor_id=dp.id
       LEFT JOIN specialties s ON s.id=ds.specialty_id
-      WHERE dh.hospital_id=? GROUP BY dp.id,u.full_name,dp.experience_years,dp.qualification,dp.biography,u.avatar,dh.consultation_fee
+      WHERE dh.hospital_id=? GROUP BY dp.id,u.full_name,dp.experience_years,dp.qualification,dp.biography,u.avatar,dh.consultation_fee,dh.room_number
       ORDER BY u.full_name ASC`, [req.params.hospitalId]);
     res.json({ data: rows });
   } catch (error) { sendError(res, error); }
@@ -56,6 +79,7 @@ exports.slots = async (req, res) => {
     const { date } = req.query;
     const hospitalId = req.query.hospitalId;
     if (!validDate(date) || !hospitalId) return res.status(400).json({ message: 'Ngày và cơ sở khám không hợp lệ.' });
+    await ensureDefaultSchedules(pool, req.params.doctorId, hospitalId);
     const [schedules] = await pool.query(`SELECT start_time,end_time,slot_duration FROM doctor_schedules
       WHERE doctor_id=? AND hospital_id=? AND day_of_week=WEEKDAY(?) + 1 AND is_active=1 ORDER BY start_time`,
     [req.params.doctorId,hospitalId,date]);
@@ -103,13 +127,19 @@ exports.create = async (req, res) => {
     const [[patient]] = await conn.query(`SELECT u.full_name,u.phone,pp.date_of_birth,pp.gender
       FROM users u LEFT JOIN patient_profiles pp ON pp.user_id=u.id WHERE u.id=?`, [userId]);
     if (!patient) { await conn.rollback(); return res.status(404).json({ message: 'Không tìm thấy hồ sơ bệnh nhân.' }); }
-    if (!patient.phone) { await conn.rollback(); return res.status(400).json({ message: 'Vui lòng cập nhật số điện thoại trước khi đặt lịch.' }); }
 
+    await ensureDefaultSchedules(conn, doctorId, hospitalId);
     const dayOfWeek = new Date(`${date}T00:00:00Z`).getUTCDay() || 7;
-    const [[schedule]] = await conn.query(`SELECT id,start_time,end_time,slot_duration FROM doctor_schedules
-      WHERE doctor_id=? AND hospital_id=? AND day_of_week=? AND is_active=1 ORDER BY start_time LIMIT 1 FOR UPDATE`, [doctorId,hospitalId,dayOfWeek]);
+    const [schedules] = await conn.query(`SELECT id,start_time,end_time,slot_duration FROM doctor_schedules
+      WHERE doctor_id=? AND hospital_id=? AND day_of_week=? AND is_active=1 ORDER BY start_time FOR UPDATE`, [doctorId,hospitalId,dayOfWeek]);
     const start = timeToMinutes(time);
-    if (!schedule || start < timeToMinutes(schedule.start_time) || start + Number(schedule.slot_duration) > timeToMinutes(schedule.end_time) || (start-timeToMinutes(schedule.start_time)) % Number(schedule.slot_duration) !== 0) {
+    const schedule = schedules.find((s) => {
+      const sStart = timeToMinutes(s.start_time);
+      const sEnd = timeToMinutes(s.end_time);
+      const dur = Number(s.slot_duration);
+      return dur > 0 && start >= sStart && start + dur <= sEnd && (start - sStart) % dur === 0;
+    });
+    if (!schedule) {
       await conn.rollback(); return res.status(409).json({ message: 'Khung giờ này không nằm trong lịch làm việc của bác sĩ.' });
     }
     const end = start + Number(schedule.slot_duration);
@@ -129,7 +159,7 @@ exports.create = async (req, res) => {
     const code = `MED-${date.replaceAll('-','')}-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
     const [created] = await conn.query(`INSERT INTO appointments
       (appointment_code,patient_id,doctor_id,hospital_id,appointment_date,start_time,end_time,patient_name,patient_phone,patient_dob,patient_gender,symptoms,consultation_fee,status)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,'PENDING')`, [code,userId,doctorId,hospitalId,date,startTime,endTime,patient.full_name,patient.phone,patient.date_of_birth,patient.gender,note.trim() || null,Number(doctor.consultation_fee || 0)]);
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,'PENDING')`, [code,userId,doctorId,hospitalId,date,startTime,endTime,patient.full_name,patient.phone || 'Chưa cập nhật',patient.date_of_birth,patient.gender,note.trim() || null,Number(doctor.consultation_fee || 0)]);
     if (slot) {
       await conn.query(`UPDATE appointment_slots SET status='BOOKED',appointment_id=? WHERE id=?`, [created.insertId,slot.id]);
     } else {
@@ -139,7 +169,7 @@ exports.create = async (req, res) => {
     await conn.query(`INSERT INTO appointment_status_history (appointment_id,old_status,new_status,changed_by,note)
       VALUES (?,NULL,'PENDING',?,'Đặt lịch qua ứng dụng')`, [created.insertId,userId]);
     await conn.commit();
-    const [[appointmentRow]] = await pool.query(`SELECT a.id,a.appointment_code,a.appointment_date,a.start_time,a.end_time,a.status,
+    const [[appointmentRow]] = await pool.query(`SELECT a.id,a.appointment_code,DATE_FORMAT(a.appointment_date, '%Y-%m-%d') AS appointment_date,a.start_time,a.end_time,a.status,
       h.name AS hospital_name,du.full_name AS doctor_name FROM appointments a JOIN hospitals h ON h.id=a.hospital_id
       JOIN doctor_profiles dp ON dp.id=a.doctor_id JOIN users du ON du.id=dp.user_id WHERE a.id=?`, [created.insertId]);
     res.status(201).json({ message: 'Đặt lịch thành công, đang chờ xác nhận.', data: appointmentRow });
@@ -151,13 +181,15 @@ exports.create = async (req, res) => {
 // GET /api/patient/appointments
 exports.history = async (req, res) => {
   try {
-    const [rows] = await pool.query(`SELECT a.id,a.appointment_code,a.appointment_date,a.start_time,a.end_time,a.status,a.symptoms,
+    const [rows] = await pool.query(`SELECT a.id,a.appointment_code,DATE_FORMAT(a.appointment_date, '%Y-%m-%d') AS appointment_date,a.start_time,a.end_time,a.status,a.symptoms,a.cancel_reason,
       a.patient_name,a.patient_phone,a.consultation_fee,h.id AS hospital_id,h.name AS hospital_name,h.address AS hospital_address,
-      dp.id AS doctor_id,du.full_name AS doctor_name,
+      dp.id AS doctor_id,du.full_name AS doctor_name,du.avatar AS doctor_avatar,dp.qualification AS doctor_qualification,
+      dh.room_number,
       GROUP_CONCAT(DISTINCT s.name ORDER BY s.name SEPARATOR ', ') AS doctor_specialty
       FROM appointments a JOIN hospitals h ON h.id=a.hospital_id JOIN doctor_profiles dp ON dp.id=a.doctor_id JOIN users du ON du.id=dp.user_id
+      LEFT JOIN doctor_hospitals dh ON dh.doctor_id=dp.id AND dh.hospital_id=h.id
       LEFT JOIN doctor_specialties ds ON ds.doctor_id=dp.id LEFT JOIN specialties s ON s.id=ds.specialty_id
-      WHERE a.patient_id=? GROUP BY a.id,a.appointment_code,a.appointment_date,a.start_time,a.end_time,a.status,a.symptoms,a.patient_name,a.patient_phone,a.consultation_fee,h.id,h.name,h.address,dp.id,du.full_name
+      WHERE a.patient_id=? GROUP BY a.id,a.appointment_code,a.appointment_date,a.start_time,a.end_time,a.status,a.symptoms,a.cancel_reason,a.patient_name,a.patient_phone,a.consultation_fee,h.id,h.name,h.address,dp.id,du.full_name,du.avatar,dp.qualification,dh.room_number
       ORDER BY a.appointment_date DESC,a.start_time DESC`, [req.user.id]);
     res.json({ data: rows });
   } catch (error) { sendError(res,error); }

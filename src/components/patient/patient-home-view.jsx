@@ -20,6 +20,8 @@ export function PatientHomeView({
   onNavigateToHospitalList,
   onNavigateToDoctorDetail,
   onNavigateToHospitalDetail,
+  onNavigateToBook,
+  onNavigateToAppointments,
 }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [featuredDoctors, setFeaturedDoctors] = useState([]);
@@ -147,6 +149,30 @@ export function PatientHomeView({
           </View>
           <Text style={styles.categoryLabel}>Bệnh viện</Text>
         </TouchableOpacity>
+
+        {!!onNavigateToBook && (
+          <TouchableOpacity
+            style={styles.categoryItem}
+            onPress={() => onNavigateToBook()}
+            activeOpacity={0.75}>
+            <View style={styles.categoryIconBox}>
+              <MaterialCommunityIcons name="calendar-plus" size={26} color="#10B981" />
+            </View>
+            <Text style={styles.categoryLabel}>Đặt khám</Text>
+          </TouchableOpacity>
+        )}
+
+        {!!onNavigateToAppointments && (
+          <TouchableOpacity
+            style={styles.categoryItem}
+            onPress={() => onNavigateToAppointments()}
+            activeOpacity={0.75}>
+            <View style={styles.categoryIconBox}>
+              <MaterialCommunityIcons name="calendar-clock" size={26} color="#F59E0B" />
+            </View>
+            <Text style={styles.categoryLabel}>Lịch khám</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       {!!error && (

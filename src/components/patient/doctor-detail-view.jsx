@@ -23,7 +23,7 @@ const weekDayNames = {
   7: 'Chủ nhật',
 };
 
-export function DoctorDetailView({ doctorId, onBack, onNavigateToHospitalDetail }) {
+export function DoctorDetailView({ doctorId, onBack, onNavigateToHospitalDetail, onNavigateToBook }) {
   const [doctor, setDoctor] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
@@ -259,6 +259,28 @@ export function DoctorDetailView({ doctorId, onBack, onNavigateToHospitalDetail 
 
         <View style={{ height: 80 }} />
       </ScrollView>
+
+      {!!onNavigateToBook && (
+        <View style={styles.stickyFooter}>
+          <TouchableOpacity
+            style={styles.bookMainBtn}
+            onPress={() =>
+              onNavigateToBook({
+                doctorId: doctor.id,
+                hospitalId: doctor.hospitals?.[0]?.hospital_id || null,
+              })
+            }
+            activeOpacity={0.85}>
+            <MaterialCommunityIcons
+              name="calendar-check"
+              size={20}
+              color="#FFFFFF"
+              style={{ marginRight: 8 }}
+            />
+            <Text style={styles.bookMainBtnText}>Đặt lịch khám ngay</Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   );
 }

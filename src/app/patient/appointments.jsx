@@ -1,14 +1,20 @@
-import React, { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
-import { useFocusEffect, router } from 'expo-router';
-import { patientBookingApi as api } from '../../services/patientBookingApi';
-const labels={pending:'Chờ xác nhận',confirmed:'Đã xác nhận',completed:'Đã khám',cancelled:'Đã hủy'};
-const colors={pending:'#AE7513',confirmed:'#1686B9',completed:'#19845B',cancelled:'#B04D52'};
-export default function AppointmentHistory(){
- const [items,setItems]=useState([]),[loading,setLoading]=useState(true),[refreshing,setRefreshing]=useState(false);
- const refresh=useCallback(async(silent=false)=>{if(!silent)setLoading(true);try{setItems(await api.history())}catch(e){Alert.alert('Không tải được lịch sử',e.message)}finally{setLoading(false);setRefreshing(false)}},[]);
- useFocusEffect(useCallback(()=>{refresh();},[refresh]));
- const cancel=(item)=>Alert.alert('Hủy lịch khám?',`Bạn muốn hủy lịch ngày ${item.date} lúc ${item.time}?`,[{text:'Không',style:'cancel'},{text:'Hủy lịch',style:'destructive',onPress:async()=>{try{await api.cancel(item._id);await refresh(true)}catch(e){Alert.alert('Không thể hủy',e.message)}}}]);
- return <View style={styles.page}><Text style={styles.heading}>Lịch sử đặt lịch</Text><FlatList data={items} keyExtractor={x=>x._id} contentContainerStyle={{paddingTop:16,paddingBottom:30,flexGrow:1}} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={()=>{setRefreshing(true);refresh(true)}}/>} ListEmptyComponent={loading?<ActivityIndicator/>:<View style={styles.empty}><Text>Chưa có lịch hẹn nào</Text><Pressable onPress={()=>router.push('/patient/book')}><Text style={styles.link}>Đặt lịch ngay</Text></Pressable></View>} renderItem={({item})=><View style={styles.card}><View style={styles.head}><Text style={styles.name}>{item.hospital?.name||'Bệnh viện'}</Text><Text style={[styles.status,{color:colors[item.status]||'#667'}]}>{labels[item.status]||item.status}</Text></View><Text style={styles.line}>Bác sĩ: {item.doctor?.name||'—'}</Text><Text style={styles.line}>Chuyên khoa: {item.doctor?.specialty||'—'}</Text><Text style={styles.line}>Ngày khám: {item.date} • {item.time}</Text>{item.note?<Text style={styles.line}>Ghi chú: {item.note}</Text>:null}<Text style={styles.small}>Mã lịch: {item._id}</Text>{['pending','confirmed'].includes(item.status)&&<Pressable style={styles.cancel} onPress={()=>cancel(item)}><Text style={styles.cancelText}>Hủy lịch</Text></Pressable>}</View>}/></View>;
+import React from 'react';
+import { router } from 'expo-router';
+import { PatientAppointmentsView } from '../../components/patient/patient-appointments-view';
+
+export default function AppointmentHistoryScreen() {
+  return (
+    <PatientAppointmentsView
+      onBack={() => (router.canGoBack() ? router.back() : router.replace('/'))}
+      onNavigateToBook={(params) =>
+        router.push({
+          pathname: '/patient/book',
+          params: {
+            ...(params?.hospitalId ? { hospitalId: String(params.hospitalId) } : {}),
+            ...(params?.doctorId ? { doctorId: String(params.doctorId) } : {}),
+          },
+        })
+      }
+    />
+  );
 }
-const styles=StyleSheet.create({page:{flex:1,backgroundColor:'#F6FAFD',padding:18},heading:{fontSize:24,fontWeight:'800',color:'#16324A'},card:{padding:17,backgroundColor:'#FFF',borderRadius:15,marginBottom:12,borderWidth:1,borderColor:'#E2EBF1'},head:{flexDirection:'row',justifyContent:'space-between',alignItems:'flex-start',gap:12},name:{fontWeight:'800',fontSize:16,color:'#24465F',flex:1},status:{fontWeight:'700',fontSize:12},line:{marginTop:10,color:'#425968'},small:{fontSize:11,marginTop:12,color:'#8897A2'},cancel:{marginTop:14,borderWidth:1,borderColor:'#CC565B',alignSelf:'flex-start',borderRadius:8,paddingVertical:9,paddingHorizontal:15},cancelText:{color:'#B04D52',fontWeight:'700'},empty:{alignItems:'center',justifyContent:'center',flex:1,gap:15},link:{color:'#1686B9',fontWeight:'700'}});

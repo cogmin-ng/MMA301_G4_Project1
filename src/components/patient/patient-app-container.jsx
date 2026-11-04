@@ -1,22 +1,25 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, SafeAreaView, StatusBar } from 'react-native';
-import { router } from 'expo-router';
 import { PatientHomeView } from './patient-home-view';
 import { DoctorListView } from './doctor-list-view';
 import { HospitalListView } from './hospital-list-view';
 import { DoctorDetailView } from './doctor-detail-view';
 import { HospitalDetailView } from './hospital-detail-view';
 import { PatientProfileView } from './patient-profile-view';
+import { PatientAppointmentsView } from './patient-appointments-view';
+import { PatientBookingView } from './patient-booking-view';
 import { PatientBottomBar } from './patient-bottom-bar';
 
 export function PatientAppContainer({ user, onLogout, onSwitchToAdmin }) {
   const [currentUser, setCurrentUser] = useState(user);
 
   // Screen stack & navigation state
-  // currentScreen: 'HOME' | 'DOCTOR_LIST' | 'HOSPITAL_LIST' | 'DOCTOR_DETAIL' | 'HOSPITAL_DETAIL' | 'PROFILE'
+  // currentScreen: 'HOME' | 'DOCTOR_LIST' | 'HOSPITAL_LIST' | 'DOCTOR_DETAIL' | 'HOSPITAL_DETAIL' | 'APPOINTMENTS' | 'BOOK_APPOINTMENT' | 'PROFILE'
   const [currentScreen, setCurrentScreen] = useState('HOME');
+  const [previousScreen, setPreviousScreen] = useState('HOME');
   const [selectedDoctorId, setSelectedDoctorId] = useState(null);
   const [selectedHospitalId, setSelectedHospitalId] = useState(null);
+  const [bookingParams, setBookingParams] = useState({ hospitalId: null, doctorId: null });
   const [searchParams, setSearchParams] = useState({});
 
   // Bottom bar tab state: 'HOME' | 'APPOINTMENTS' | 'ACCOUNT'
@@ -38,13 +41,29 @@ export function PatientAppContainer({ user, onLogout, onSwitchToAdmin }) {
   };
 
   const navigateToDoctorDetail = (doctorId) => {
+    setPreviousScreen(currentScreen);
     setSelectedDoctorId(doctorId);
     setCurrentScreen('DOCTOR_DETAIL');
   };
 
   const navigateToHospitalDetail = (hospitalId) => {
+    setPreviousScreen(currentScreen);
     setSelectedHospitalId(hospitalId);
     setCurrentScreen('HOSPITAL_DETAIL');
+  };
+
+  const navigateToAppointments = () => {
+    setCurrentScreen('APPOINTMENTS');
+    setBottomTab('APPOINTMENTS');
+  };
+
+  const navigateToBookAppointment = (params = {}) => {
+    setPreviousScreen(currentScreen);
+    setBookingParams({
+      hospitalId: params?.hospitalId || null,
+      doctorId: params?.doctorId || null,
+    });
+    setCurrentScreen('BOOK_APPOINTMENT');
   };
 
   const navigateToProfile = () => {
@@ -57,12 +76,17 @@ export function PatientAppContainer({ user, onLogout, onSwitchToAdmin }) {
     if (tabKey === 'HOME') {
       setCurrentScreen('HOME');
     } else if (tabKey === 'APPOINTMENTS') {
-      router.push('/patient/appointments');
+      setCurrentScreen('APPOINTMENTS');
+    } else if (tabKey === 'PROFILE') {
+      setCurrentScreen('PROFILE');
     }
   };
 
-  // Hiển thị BottomBar ở màn hình HOME và PROFILE
-  const showBottomBar = currentScreen === 'HOME' || currentScreen === 'PROFILE';
+  // Hiển thị BottomBar ở 3 màn hình tab chính: HOME, APPOINTMENTS, PROFILE
+  const showBottomBar =
+    currentScreen === 'HOME' ||
+    currentScreen === 'APPOINTMENTS' ||
+    currentScreen === 'PROFILE';
 
   return (
     <SafeAreaView style={styles.safeContainer}>
@@ -77,6 +101,8 @@ export function PatientAppContainer({ user, onLogout, onSwitchToAdmin }) {
             onNavigateToHospitalList={navigateToHospitalList}
             onNavigateToDoctorDetail={navigateToDoctorDetail}
             onNavigateToHospitalDetail={navigateToHospitalDetail}
+            onNavigateToBook={navigateToBookAppointment}
+            onNavigateToAppointments={navigateToAppointments}
           />
         )}
 
@@ -106,8 +132,15 @@ export function PatientAppContainer({ user, onLogout, onSwitchToAdmin }) {
         {currentScreen === 'DOCTOR_DETAIL' && (
           <DoctorDetailView
             doctorId={selectedDoctorId}
-            onBack={() => setCurrentScreen('DOCTOR_LIST')}
+            onBack={() =>
+              setCurrentScreen(
+                previousScreen === 'APPOINTMENTS' || previousScreen === 'HOSPITAL_DETAIL'
+                  ? previousScreen
+                  : 'DOCTOR_LIST'
+              )
+            }
             onNavigateToHospitalDetail={navigateToHospitalDetail}
+            onNavigateToBook={navigateToBookAppointment}
           />
         )}
 
@@ -115,12 +148,41 @@ export function PatientAppContainer({ user, onLogout, onSwitchToAdmin }) {
         {currentScreen === 'HOSPITAL_DETAIL' && (
           <HospitalDetailView
             hospitalId={selectedHospitalId}
-            onBack={() => setCurrentScreen('HOSPITAL_LIST')}
+            onBack={() =>
+              setCurrentScreen(
+                previousScreen === 'DOCTOR_DETAIL' ? 'DOCTOR_DETAIL' : 'HOSPITAL_LIST'
+              )
+            }
+            onNavigateToDoctorDetail={navigateToDoctorDetail}
+            onNavigateToBook={navigateToBookAppointment}
+          />
+        )}
+
+        {/* 6. Màn hình Lịch khám của bệnh nhân */}
+        {currentScreen === 'APPOINTMENTS' && (
+          <PatientAppointmentsView
+            onNavigateToBook={navigateToBookAppointment}
             onNavigateToDoctorDetail={navigateToDoctorDetail}
           />
         )}
 
-        {/* 6. Màn hình Patient Profile */}
+        {/* 7. Màn hình Đặt lịch khám */}
+        {currentScreen === 'BOOK_APPOINTMENT' && (
+          <PatientBookingView
+            initialHospitalId={bookingParams.hospitalId}
+            initialDoctorId={bookingParams.doctorId}
+            onBack={() =>
+              setCurrentScreen(
+                previousScreen && previousScreen !== 'BOOK_APPOINTMENT'
+                  ? previousScreen
+                  : 'HOME'
+              )
+            }
+            onBookingSuccess={navigateToAppointments}
+          />
+        )}
+
+        {/* 8. Màn hình Patient Profile */}
         {currentScreen === 'PROFILE' && (
           <PatientProfileView
             user={currentUser}

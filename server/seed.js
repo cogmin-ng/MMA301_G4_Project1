@@ -96,6 +96,30 @@ async function seed() {
       console.log(`ℹ️ Hospitals table already has ${hospitals[0].count} records.`);
     }
 
+    // 3. Đảm bảo các liên kết doctor_hospitals đều có lịch khám hàng tuần (doctor_schedules)
+    const [docHospitals] = await conn.query('SELECT doctor_id, hospital_id FROM doctor_hospitals');
+    let seededSchedules = 0;
+    for (const dh of docHospitals) {
+      const [existingSched] = await conn.query(
+        'SELECT COUNT(*) as count FROM doctor_schedules WHERE doctor_id = ? AND hospital_id = ? AND is_active = 1',
+        [dh.doctor_id, dh.hospital_id]
+      );
+      if (existingSched[0].count === 0) {
+        for (let day = 1; day <= 7; day++) {
+          await conn.query(
+            `INSERT INTO doctor_schedules (doctor_id, hospital_id, day_of_week, start_time, end_time, slot_duration, is_active)
+             VALUES (?, ?, ?, '08:00:00', '11:30:00', 30, 1),
+                    (?, ?, ?, '13:30:00', '17:00:00', 30, 1)`,
+            [dh.doctor_id, dh.hospital_id, day, dh.doctor_id, dh.hospital_id, day]
+          );
+          seededSchedules += 2;
+        }
+      }
+    }
+    if (seededSchedules > 0) {
+      console.log(`✅ Seeded ${seededSchedules} weekly doctor_schedules windows.`);
+    }
+
     console.log('🎉 Seeding completed successfully!');
   } catch (err) {
     console.error('❌ Error during seeding:', err);

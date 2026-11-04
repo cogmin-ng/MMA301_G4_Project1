@@ -36,6 +36,7 @@ export function HospitalDetailView({
   hospitalId,
   onBack,
   onNavigateToDoctorDetail,
+  onNavigateToBook,
 }) {
   const [hospital, setHospital] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -307,6 +308,25 @@ export function HospitalDetailView({
 
         <View style={{ height: 80 }} />
       </ScrollView>
+
+      {!!onNavigateToBook && (
+        <View style={styles.stickyFooter}>
+          <TouchableOpacity
+            style={styles.hospitalMainBookBtn}
+            onPress={() => onNavigateToBook({ hospitalId: hospital.id })}
+            activeOpacity={0.85}>
+            <MaterialCommunityIcons
+              name="calendar-plus"
+              size={20}
+              color="#FFFFFF"
+              style={{ marginRight: 8 }}
+            />
+            <Text style={{ fontSize: 15, fontWeight: '700', color: '#FFFFFF' }}>
+              Đặt lịch khám tại bệnh viện
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   );
 }
