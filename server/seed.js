@@ -1,4 +1,5 @@
-require('dotenv').config();
+const path = require('path');
+require('dotenv').config({ path: [path.resolve(__dirname, '.env'), path.resolve(__dirname, '.env.example')] });
 const pool = require('./db');
 
 async function seed() {
@@ -33,6 +34,32 @@ async function seed() {
       console.log('✅ Users & Profiles seeded successfully.');
     } else {
       console.log(`ℹ️ Users table already has ${users[0].count} records.`);
+    }
+
+    await conn.query(`
+      INSERT INTO users (full_name, email, phone, password, role, is_active, avatar) VALUES
+      ('Trần Công Minh (Bệnh nhân)', 'minh.patient@gmail.com', '0987654321', '123456', 'PATIENT', TRUE, 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150'),
+      ('Phạm Thanh Hải (Bệnh nhân)', 'hai.patient@gmail.com', '0977889900', '123456', 'PATIENT', TRUE, 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150')
+      ON DUPLICATE KEY UPDATE is_active = is_active;
+    `);
+    await conn.query(
+      `UPDATE users SET role = 'PATIENT', is_active = TRUE
+       WHERE email IN (?, ?)`,
+      ['minh.patient@gmail.com', 'hai.patient@gmail.com']
+    );
+
+    const [patientUsers] = await conn.query(
+      'SELECT id FROM users WHERE email IN (?, ?)',
+      ['minh.patient@gmail.com', 'hai.patient@gmail.com']
+    );
+    for (const patient of patientUsers) {
+      await conn.query(
+        `INSERT INTO patient_profiles (user_id)
+         SELECT ? WHERE NOT EXISTS (
+           SELECT 1 FROM patient_profiles WHERE user_id = ?
+         )`,
+        [patient.id, patient.id]
+      );
     }
 
     // 2. Kiểm tra hospitals

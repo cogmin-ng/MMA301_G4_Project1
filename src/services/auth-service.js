@@ -1,5 +1,10 @@
 import { API_BASE_URL } from './api-config';
 
+const withAuth = (headers = {}) => {
+  const token = authService.getToken();
+  return { ...headers, ...(token ? { Authorization: `Bearer ${token}` } : {}) };
+};
+
 class AuthService {
   constructor() {
     this.currentUser = null;
@@ -64,7 +69,7 @@ class AuthService {
       if (params?.role && params.role !== 'ALL') searchParams.append('role', params.role);
       if (params?.search) searchParams.append('search', params.search);
 
-      const res = await fetch(`${API_BASE_URL}/auth/users?${searchParams.toString()}`);
+      const res = await fetch(`${API_BASE_URL}/auth/users?${searchParams.toString()}`, { headers: withAuth() });
       if (res.ok) {
         return await res.json();
       }
@@ -77,7 +82,7 @@ class AuthService {
   async updateUserRole(userId, role) {
     const res = await fetch(`${API_BASE_URL}/auth/users/${userId}/role`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: withAuth({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ role }),
     });
     let data;
@@ -94,7 +99,7 @@ class AuthService {
 
   async toggleUserStatus(userId) {
     const res = await fetch(`${API_BASE_URL}/auth/users/${userId}/status`, {
-      method: 'PATCH',
+      method: 'PATCH', headers: withAuth(),
     });
     let data;
     try {
@@ -111,7 +116,7 @@ class AuthService {
   async createUser(data) {
     const res = await fetch(`${API_BASE_URL}/auth/users`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: withAuth({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(data),
     });
     let resData;
@@ -131,26 +136,31 @@ class AuthService {
   }
 
   async switchAccountByRole(role) {
-    const users = await this.getAvailableUsers();
-    const matched = users.find((u) => u.role === role && u.is_active);
-    if (!matched) {
-      throw new Error(`Không tìm thấy tài khoản vai trò ${role} đang hoạt động.`);
-    }
-    this.currentUser = matched;
-    this.token = `jwt-${matched.id}-${matched.role.toLowerCase()}-${Date.now()}`;
-    return matched;
+    const response = await fetch(`${API_BASE_URL}/auth/switch-role`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', ...(this.token ? { Authorization: `Bearer ${this.token}` } : {}) },
+      body: JSON.stringify({ role }),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Không thể chuyển vai trò.');
+    this.currentUser = data.user; this.token = data.token;
+    return data.user;
   }
 
   async switchAccountToUser(user) {
-    this.currentUser = user;
-    this.token = `jwt-${user.id}-${user.role.toLowerCase()}-${Date.now()}`;
-    return user;
+    const response = await fetch(`${API_BASE_URL}/auth/switch-user`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', ...(this.token ? { Authorization: `Bearer ${this.token}` } : {}) },
+      body: JSON.stringify({ user_id: user.id }),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Không thể đăng nhập kiểm thử tài khoản.');
+    this.currentUser = data.user; this.token = data.token;
+    return data.user;
   }
 
   async updateAvatar(userId, avatar) {
     const res = await fetch(`${API_BASE_URL}/auth/users/${userId}/avatar`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: withAuth({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ avatar }),
     });
     let data;

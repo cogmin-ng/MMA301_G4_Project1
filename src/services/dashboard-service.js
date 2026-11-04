@@ -1,8 +1,9 @@
 import { API_BASE_URL } from './api-config';
+import { authHeaders } from './auth-headers';
 
 class DashboardService {
   async getDashboardStats() {
-    const res = await fetch(`${API_BASE_URL}/admin/dashboard/stats`);
+    const res = await fetch(`${API_BASE_URL}/admin/dashboard/stats`, { headers: authHeaders() });
     if (!res.ok) {
       throw new Error('Lỗi lấy dữ liệu thống kê Dashboard.');
     }
@@ -20,7 +21,7 @@ class DashboardService {
   }
 
   async getRecentHospitals() {
-    const res = await fetch(`${API_BASE_URL}/admin/dashboard/stats`);
+    const res = await fetch(`${API_BASE_URL}/admin/dashboard/stats`, { headers: authHeaders() });
     if (!res.ok) {
       return [];
     }

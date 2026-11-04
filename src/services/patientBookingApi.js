@@ -1,11 +1,12 @@
-/** Set EXPO_PUBLIC_API_URL in root .env. For Android emulator use http://10.0.2.2:5000 */
-const BASE = (process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000').replace(/\/$/, '');
-// Integrate this with the app's existing authentication/token storage.
-let tokenProvider = async () => null;
+import { API_BASE_URL } from './api-config';
+import { authService } from './auth-service';
+
+const BASE = API_BASE_URL;
+let tokenProvider = async () => authService.getToken();
 export const setPatientTokenProvider = (provider) => { tokenProvider = provider; };
 async function request(path, options = {}) {
   const token = await tokenProvider();
-  const response = await fetch(`${BASE}/api/patient${path}`, {
+  const response = await fetch(`${BASE}/patient${path}`, {
     ...options,
     headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}), ...options.headers },
   });
@@ -14,10 +15,19 @@ async function request(path, options = {}) {
   return body.data;
 }
 export const patientBookingApi = {
-  hospitals: () => request('/hospitals'),
-  doctors: (hospitalId) => request(`/hospitals/${encodeURIComponent(hospitalId)}/doctors`),
-  slots: (doctorId, date) => request(`/doctors/${encodeURIComponent(doctorId)}/slots?date=${encodeURIComponent(date)}`),
+  hospitals: async () => (await request('/hospitals')).map((hospital) => ({ ...hospital, _id: hospital.id })),
+  doctors: async (hospitalId) => (await request(`/hospitals/${encodeURIComponent(hospitalId)}/doctors`)).map((doctor) => ({ ...doctor, _id: doctor.id })),
+  slots: async (doctorId, hospitalId, date) => request(`/doctors/${encodeURIComponent(doctorId)}/slots?hospitalId=${encodeURIComponent(hospitalId)}&date=${encodeURIComponent(date)}`),
   create: (payload) => request('/appointments', { method: 'POST', body: JSON.stringify(payload) }),
-  history: () => request('/appointments'),
+  history: async () => (await request('/appointments')).map((appointment) => ({
+    ...appointment,
+    _id: appointment.id,
+    date: appointment.appointment_date,
+    time: appointment.start_time,
+    note: appointment.symptoms,
+    doctor: { name: appointment.doctor_name, specialty: appointment.doctor_specialty },
+    hospital: { name: appointment.hospital_name, address: appointment.hospital_address },
+    status: String(appointment.status).toLowerCase(),
+  })),
   cancel: (id) => request(`/appointments/${encodeURIComponent(id)}/cancel`, { method: 'PATCH' }),
 };

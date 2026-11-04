@@ -1,4 +1,5 @@
 import { API_BASE_URL } from './api-config';
+import { authHeaders } from './auth-headers';
 
 const readResponse = async (response, defaultMessage) => {
   let data;
@@ -203,7 +204,7 @@ class DoctorService {
     try {
       const response = await fetch(`${API_BASE_URL}/doctors`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify(data),
       });
       const result = await readResponse(response, 'Lỗi thêm bác sĩ mới.');
@@ -240,7 +241,7 @@ class DoctorService {
     try {
       const response = await fetch(`${API_BASE_URL}/doctors/${id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify(data),
       });
       const result = await readResponse(response, 'Lỗi cập nhật thông tin bác sĩ.');
@@ -264,7 +265,7 @@ class DoctorService {
   async toggleDoctorStatus(id) {
     try {
       const response = await fetch(`${API_BASE_URL}/doctors/${id}/status`, {
-        method: 'PATCH',
+        method: 'PATCH', headers: authHeaders(),
       });
       return await readResponse(response, 'Lỗi đổi trạng thái bác sĩ.');
     } catch {
@@ -285,7 +286,7 @@ class DoctorService {
   async deleteDoctor(id) {
     try {
       const response = await fetch(`${API_BASE_URL}/doctors/${id}`, {
-        method: 'DELETE',
+        method: 'DELETE', headers: authHeaders(),
       });
       return await readResponse(response, 'Lỗi xóa bác sĩ.');
     } catch (err) {

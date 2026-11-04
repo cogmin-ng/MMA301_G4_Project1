@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../db');
+const { authenticate, requireRole } = require('../auth');
 
 // GET /api/hospitals (Tìm kiếm, lọc tỉnh thành, trạng thái)
 router.get('/', async (req, res) => {
@@ -131,14 +132,6 @@ router.get('/:id', async (req, res) => {
        ORDER BY s.name`,
       [id]
     );
-    const [workingHours] = await pool.query(
-      `SELECT day_of_week, open_time, close_time, is_closed
-       FROM hospital_working_hours
-       WHERE hospital_id = ?
-       ORDER BY day_of_week`,
-      [id]
-    );
-
     hospital.doctor_count = Number(hospital.doctor_count);
     hospital.doctors = doctors.map((d) => ({
       id: d.id,
@@ -157,7 +150,8 @@ router.get('/:id', async (req, res) => {
       consultation_fee: d.consultation_fee === null ? null : Number(d.consultation_fee),
     }));
     hospital.specialties = specialties.map((specialty) => specialty.name);
-    hospital.working_hours = workingHours;
+    // The supplied MySQL schema stores doctor hours, not hospital opening hours.
+    hospital.working_hours = [];
 
     return res.json(hospital);
   } catch (err) {
@@ -166,7 +160,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // POST /api/hospitals (Thêm mới bệnh viện - Module Sáng)
-router.post('/', async (req, res) => {
+router.post('/', authenticate, requireRole('ADMIN'), async (req, res) => {
   try {
     const { name, address, province, district, phone, email, description, image_url, status } = req.body;
 
@@ -205,7 +199,7 @@ router.post('/', async (req, res) => {
 });
 
 // PUT /api/hospitals/:id (Cập nhật thông tin bệnh viện)
-router.put('/:id', async (req, res) => {
+router.put('/:id', authenticate, requireRole('ADMIN'), async (req, res) => {
   try {
     const { id } = req.params;
     const { name, address, province, district, phone, email, description, image_url, status } = req.body;
@@ -252,7 +246,7 @@ router.put('/:id', async (req, res) => {
 });
 
 // PATCH /api/hospitals/:id/status (Bật / Tắt trạng thái ACTIVE / INACTIVE)
-router.patch('/:id/status', async (req, res) => {
+router.patch('/:id/status', authenticate, requireRole('ADMIN'), async (req, res) => {
   try {
     const { id } = req.params;
     await pool.query(
@@ -275,7 +269,7 @@ router.patch('/:id/status', async (req, res) => {
 });
 
 // DELETE /api/hospitals/:id (Xóa bệnh viện)
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', authenticate, requireRole('ADMIN'), async (req, res) => {
   try {
     const { id } = req.params;
     const [result] = await pool.query('DELETE FROM hospitals WHERE id = ?', [id]);

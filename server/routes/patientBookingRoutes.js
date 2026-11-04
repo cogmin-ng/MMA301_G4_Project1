@@ -1,7 +1,8 @@
 const router=require('express').Router();
+const authenticate=require('../middleware/auth');
 const requirePatient=require('../middleware/requirePatient');
 const c=require('../controllers/patientBookingController');
-router.use(requirePatient); // FIRST mount your existing JWT/session auth middleware in server entrypoint
+router.use(authenticate,requirePatient);
 router.get('/hospitals',c.hospitals);
 router.get('/hospitals/:hospitalId/doctors',c.doctors);
 router.get('/doctors/:doctorId/slots',c.slots);

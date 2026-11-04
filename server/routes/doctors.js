@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../db');
+const { authenticate, requireRole, hashPassword } = require('../auth');
 
 const getDoctorSelect = (hospitalId = '') => `
   SELECT
@@ -26,8 +27,8 @@ const getDoctorSelect = (hospitalId = '') => `
   FROM doctor_profiles dp
   JOIN users u ON u.id = dp.user_id
   LEFT JOIN (
-    SELECT 
-      ds.doctor_id, 
+    SELECT
+      ds.doctor_id,
       GROUP_CONCAT(DISTINCT s.name ORDER BY s.name SEPARATOR ', ') AS specialty_names,
       GROUP_CONCAT(DISTINCT ds.specialty_id ORDER BY ds.specialty_id SEPARATOR ',') AS specialty_ids
     FROM doctor_specialties ds
@@ -218,7 +219,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // POST /api/doctors (Tạo mới bác sĩ - Admin CRUD)
-router.post('/', async (req, res) => {
+router.post('/', authenticate, requireRole('ADMIN'), async (req, res) => {
   const conn = await pool.getConnection();
   try {
     await conn.beginTransaction();
@@ -265,7 +266,7 @@ router.post('/', async (req, res) => {
         full_name.trim(),
         email.trim(),
         phone ? phone.trim() : null,
-        password ? password.trim() : '123456',
+        await hashPassword(password ? password.trim() : '123456'),
         avatar ? avatar.trim() : 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=300',
         status === 'INACTIVE' ? 0 : 1,
       ]
@@ -334,7 +335,7 @@ router.post('/', async (req, res) => {
 });
 
 // PUT /api/doctors/:id (Cập nhật thông tin bác sĩ - Admin CRUD)
-router.put('/:id', async (req, res) => {
+router.put('/:id', authenticate, requireRole('ADMIN'), async (req, res) => {
   const conn = await pool.getConnection();
   try {
     await conn.beginTransaction();
@@ -374,7 +375,7 @@ router.put('/:id', async (req, res) => {
 
     // 1. Cập nhật bảng users
     await conn.query(
-      `UPDATE users 
+      `UPDATE users
        SET full_name = ?, phone = ?, avatar = COALESCE(?, avatar), is_active = ?
        WHERE id = ?`,
       [
@@ -449,7 +450,7 @@ router.put('/:id', async (req, res) => {
 });
 
 // PATCH /api/doctors/:id/status (Bật / Tắt trạng thái Hoạt động)
-router.patch('/:id/status', async (req, res) => {
+router.patch('/:id/status', authenticate, requireRole('ADMIN'), async (req, res) => {
   const conn = await pool.getConnection();
   try {
     await conn.beginTransaction();
@@ -488,7 +489,7 @@ router.patch('/:id/status', async (req, res) => {
 });
 
 // DELETE /api/doctors/:id (Xóa bác sĩ)
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', authenticate, requireRole('ADMIN'), async (req, res) => {
   const conn = await pool.getConnection();
   try {
     const doctorId = req.params.id;

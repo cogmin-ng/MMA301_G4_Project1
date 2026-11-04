@@ -1,4 +1,5 @@
 import { API_BASE_URL } from './api-config';
+import { authHeaders } from './auth-headers';
 
 const readResponse = async (response, defaultMessage) => {
   let data;
@@ -249,7 +250,7 @@ class AppointmentService {
       }
       if (params.date) query.append('date', params.date);
 
-      const response = await fetch(`${API_BASE_URL}/appointments?${query.toString()}`);
+      const response = await fetch(`${API_BASE_URL}/appointments?${query.toString()}`, { headers: authHeaders() });
       const data = await readResponse(response, 'Không thể tải danh sách lịch hẹn từ máy chủ.');
       localAppointments = data;
       return data;
@@ -282,7 +283,7 @@ class AppointmentService {
 
   async getAppointmentStats() {
     try {
-      const response = await fetch(`${API_BASE_URL}/appointments/stats`);
+      const response = await fetch(`${API_BASE_URL}/appointments/stats`, { headers: authHeaders() });
       return await readResponse(response, 'Không thể tải thống kê lịch hẹn.');
     } catch {
       const total = localAppointments.length;
@@ -298,7 +299,7 @@ class AppointmentService {
 
   async getAppointmentById(id) {
     try {
-      const response = await fetch(`${API_BASE_URL}/appointments/${encodeURIComponent(id)}`);
+      const response = await fetch(`${API_BASE_URL}/appointments/${encodeURIComponent(id)}`, { headers: authHeaders() });
       return await readResponse(response, 'Không thể tải thông tin lịch hẹn từ máy chủ.');
     } catch {
       const app = localAppointments.find((a) => String(a.id) === String(id));
@@ -311,7 +312,7 @@ class AppointmentService {
     try {
       const response = await fetch(`${API_BASE_URL}/appointments/${id}/confirm`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ note, admin_id: adminId }),
       });
       const result = await readResponse(response, 'Lỗi xác nhận lịch hẹn.');
@@ -343,7 +344,7 @@ class AppointmentService {
     try {
       const response = await fetch(`${API_BASE_URL}/appointments/${id}/cancel`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({
           reason,
           statusType,
@@ -381,7 +382,7 @@ class AppointmentService {
     try {
       const response = await fetch(`${API_BASE_URL}/appointments/${id}/status`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ status, note, admin_id: adminId }),
       });
       const result = await readResponse(response, 'Lỗi cập nhật trạng thái lịch hẹn.');
@@ -413,7 +414,7 @@ class AppointmentService {
     try {
       const response = await fetch(`${API_BASE_URL}/appointments`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify(data),
       });
       const result = await readResponse(response, 'Lỗi đặt lịch hẹn.');
@@ -467,7 +468,7 @@ class AppointmentService {
   async deleteAppointment(id) {
     try {
       const response = await fetch(`${API_BASE_URL}/appointments/${id}`, {
-        method: 'DELETE',
+        method: 'DELETE', headers: authHeaders(),
       });
       return await readResponse(response, 'Lỗi xóa lịch hẹn.');
     } catch {

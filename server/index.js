@@ -1,4 +1,5 @@
-require('dotenv').config();
+const path = require('path');
+require('dotenv').config({ path: [path.resolve(__dirname, '.env'), path.resolve(__dirname, '.env.example')] });
 const express = require('express');
 const cors = require('cors');
 
@@ -9,6 +10,7 @@ const doctorRoutes = require('./routes/doctors');
 const appointmentRoutes = require('./routes/appointments');
 const dashboardRoutes = require('./routes/dashboard');
 const uploadRoutes = require('./routes/upload');
+const doctorPortalRoutes = require('./routes/doctor-portal');
 const patientBookingRoutes = require('./routes/patientBookingRoutes');
 
 const app = express();
@@ -22,6 +24,7 @@ app.use(express.urlencoded({ extended: true, limit: '20mb' }));
 app.use('/api/auth', authRoutes);
 app.use('/api/hospitals', hospitalRoutes);
 app.use('/api/doctors', doctorRoutes);
+app.use('/api/doctor-portal', doctorPortalRoutes);
 app.use('/api/appointments', appointmentRoutes);
 app.use('/api/admin/dashboard', dashboardRoutes);
 app.use('/api/upload', uploadRoutes);

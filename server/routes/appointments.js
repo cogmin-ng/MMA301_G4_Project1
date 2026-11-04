@@ -1,9 +1,12 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../db');
+const { authenticate, requireRole } = require('../auth');
+
+router.use(authenticate, requireRole('ADMIN'));
 
 const getAppointmentSelect = () => `
-  SELECT 
+  SELECT
     a.id,
     a.appointment_code,
     a.patient_id,
@@ -39,7 +42,7 @@ const getAppointmentSelect = () => `
   JOIN doctor_profiles dp ON dp.id = a.doctor_id
   JOIN users du ON du.id = dp.user_id
   JOIN hospitals h ON h.id = a.hospital_id
-  LEFT JOIN doctor_hospitals dh 
+  LEFT JOIN doctor_hospitals dh
     ON dh.doctor_id = a.doctor_id AND dh.hospital_id = a.hospital_id
 `;
 
@@ -78,7 +81,7 @@ const toAppointment = (row) => ({
 router.get('/stats', async (req, res) => {
   try {
     const [counts] = await pool.query(`
-      SELECT 
+      SELECT
         COUNT(*) AS total,
         SUM(CASE WHEN status = 'PENDING' THEN 1 ELSE 0 END) AS pending,
         SUM(CASE WHEN status = 'CONFIRMED' THEN 1 ELSE 0 END) AS confirmed,
@@ -185,7 +188,7 @@ router.get('/:id', async (req, res) => {
 
     // Lấy lịch sử chuyển trạng thái
     const [historyRows] = await pool.query(
-      `SELECT 
+      `SELECT
          ash.id,
          ash.old_status,
          ash.new_status,
@@ -215,7 +218,7 @@ router.patch('/:id/confirm', async (req, res) => {
   try {
     await conn.beginTransaction();
     const appointmentId = req.params.id;
-    const changedBy = req.body.admin_id || 1; // Default to admin ID 1
+    const changedBy = req.user.id;
     const note = req.body.note || 'Quản trị viên đã xác nhận lịch hẹn.';
 
     const [rows] = await conn.query('SELECT * FROM appointments WHERE id = ?', [appointmentId]);
@@ -229,8 +232,8 @@ router.patch('/:id/confirm', async (req, res) => {
 
     // Cập nhật trạng thái
     await conn.query(
-      `UPDATE appointments 
-       SET status = 'CONFIRMED', updated_at = NOW() 
+      `UPDATE appointments
+       SET status = 'CONFIRMED', updated_at = NOW()
        WHERE id = ?`,
       [appointmentId]
     );
@@ -282,7 +285,7 @@ router.patch('/:id/cancel', async (req, res) => {
     const appointmentId = req.params.id;
     const reason = req.body.reason ? req.body.reason.trim() : 'Quản trị viên đã hủy lịch hẹn.';
     const statusType = req.body.statusType === 'REJECTED' ? 'REJECTED' : 'CANCELLED';
-    const changedBy = req.body.admin_id || 1;
+    const changedBy = req.user.id;
     const note = req.body.note || reason;
 
     const [rows] = await conn.query('SELECT * FROM appointments WHERE id = ?', [appointmentId]);
@@ -296,8 +299,8 @@ router.patch('/:id/cancel', async (req, res) => {
 
     // Cập nhật trạng thái và lý do hủy
     await conn.query(
-      `UPDATE appointments 
-       SET status = ?, cancellation_reason = ?, updated_at = NOW() 
+      `UPDATE appointments
+       SET status = ?, cancellation_reason = ?, updated_at = NOW()
        WHERE id = ?`,
       [statusType, reason, appointmentId]
     );
@@ -308,6 +311,9 @@ router.patch('/:id/cancel', async (req, res) => {
        VALUES (?, ?, ?, ?, ?)`,
       [appointmentId, oldStatus, statusType, changedBy, note]
     );
+    if (statusType === 'REJECTED' || statusType === 'CANCELLED') {
+      await conn.query("UPDATE appointment_slots SET status='AVAILABLE',appointment_id=NULL WHERE appointment_id=?", [appointmentId]);
+    }
 
     // Gửi thông báo đến người bệnh
     if (currentAppointment.patient_id) {
@@ -348,7 +354,7 @@ router.patch('/:id/status', async (req, res) => {
   try {
     await conn.beginTransaction();
     const appointmentId = req.params.id;
-    const { status, note, admin_id } = req.body;
+    const { status, note } = req.body;
 
     const allowedStatuses = ['PENDING', 'CONFIRMED', 'REJECTED', 'CANCELLED', 'COMPLETED', 'NO_SHOW'];
     if (!allowedStatuses.includes(status)) {
@@ -372,7 +378,7 @@ router.patch('/:id/status', async (req, res) => {
     await conn.query(
       `INSERT INTO appointment_status_history (appointment_id, old_status, new_status, changed_by, note)
        VALUES (?, ?, ?, ?, ?)`,
-      [appointmentId, oldStatus, status, admin_id || 1, note || `Cập nhật trạng thái sang ${status}`]
+      [appointmentId, oldStatus, status, req.user.id, note || `Cập nhật trạng thái sang ${status}`]
     );
 
     await conn.commit();
@@ -492,7 +498,7 @@ router.delete('/:id', async (req, res) => {
     const appointmentId = req.params.id;
 
     await conn.query('DELETE FROM appointment_status_history WHERE appointment_id = ?', [appointmentId]);
-    await conn.query('UPDATE appointment_slots SET appointment_id = NULL WHERE appointment_id = ?', [appointmentId]);
+    await conn.query("UPDATE appointment_slots SET status='AVAILABLE', appointment_id=NULL WHERE appointment_id = ?", [appointmentId]);
     const [result] = await conn.query('DELETE FROM appointments WHERE id = ?', [appointmentId]);
 
     if (result.affectedRows === 0) {
